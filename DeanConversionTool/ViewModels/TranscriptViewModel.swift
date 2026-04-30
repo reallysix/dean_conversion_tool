@@ -62,7 +62,7 @@ class TranscriptViewModel: ObservableObject {
 
     // MARK: - Initialization
     init() {
-        loadModel()
+        // Don't load model in init - load lazily when needed
     }
 
     /// Load the whisper model
@@ -74,6 +74,13 @@ class TranscriptViewModel: ObservableObject {
         } catch {
             self.error = "Failed to load model: \(error.localizedDescription)"
         }
+    }
+
+    /// Load model lazily when needed
+    private func ensureModelLoaded() throws {
+        guard !whisperService.isModelLoaded else { return }
+        let modelPath = getModelPath()
+        try whisperService.loadModel(modelPath: modelPath)
     }
 
     /// Get the path to the whisper model
@@ -110,6 +117,9 @@ class TranscriptViewModel: ObservableObject {
 
         Task {
             do {
+                // Step 0: Ensure model is loaded
+                try ensureModelLoaded()
+
                 // Step 1: Preprocess audio
                 updateLoading("Preparing audio file...", progress: 0.1)
                 let wavPath = try preprocessAudio(inputPath: url.path)
