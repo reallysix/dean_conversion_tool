@@ -32,7 +32,7 @@ class WhisperService {
         }
 
         var params = whisper_context_default_params()
-        params.use_gpu = true  // Enable Metal GPU acceleration
+        params.use_gpu = false  // Disable GPU to avoid Metal initialization issues
 
         guard let newContext = whisper_init_from_file_with_params(modelPath, params) else {
             throw WhisperError.modelLoadFailed
