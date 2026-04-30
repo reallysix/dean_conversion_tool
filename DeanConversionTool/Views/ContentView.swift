@@ -301,7 +301,7 @@ struct ErrorBanner: View {
             .buttonStyle(.plain)
         }
         .padding()
-        .background(Color(NSColor.warningBackgroundColor))
+        .background(Color.orange.opacity(0.2))
     }
 }
 

@@ -53,52 +53,34 @@ class WhisperService {
             return
         }
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
+        // Configure whisper parameters
+        var params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY)
+        params.print_special = false
+        params.print_progress = false
+        params.print_realtime = false
+        params.print_timestamps = false
+        params.translate = false
+        params.single_segment = false
+        params.no_timestamps = false
+        params.n_threads = Int32(max(1, ProcessInfo.processInfo.activeProcessorCount - 2))
 
-            // Configure whisper parameters
-            var params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY)
-            params.print_special = false
-            params.print_progress = false
-            params.print_realtime = false
-            params.print_timestamps = false
-            params.translate = false
-            params.single_segment = false
-            params.no_timestamps = false
-            params.n_threads = Int32(max(1, ProcessInfo.processInfo.activeProcessorCount - 2))  // Leave 2 cores free
+        // Load audio data
+        guard let audioData = self.loadAudio(path: audioPath) else {
+            onComplete(.failure(WhisperError.audioLoadFailed))
+            return
+        }
 
-            // Set language if specified
-            if let language = language {
-                language.withCString { langPtr in
-                    var langCopy = langPtr
-                    // Note: This is a simplified approach. In production, you'd need to handle this properly
-                }
-            }
+        // Run inference
+        let result = audioData.withUnsafeBufferPointer { buffer in
+            whisper_full(context, params, buffer.baseAddress, Int32(audioData.count))
+        }
 
-            // Load audio data
-            guard let audioData = self.loadAudio(path: audioPath) else {
-                DispatchQueue.main.async {
-                    onComplete(.failure(WhisperError.audioLoadFailed))
-                }
-                return
-            }
-
-            // Run inference
-            let result = audioData.withUnsafeBufferPointer { buffer in
-                whisper_full(context, params, buffer.baseAddress, Int32(audioData.count), nil, nil, nil)
-            }
-
-            if result == 0 {
-                // Extract segments
-                let segments = self.extractSegments(context: context)
-                DispatchQueue.main.async {
-                    onComplete(.success(segments))
-                }
-            } else {
-                DispatchQueue.main.async {
-                    onComplete(.failure(WhisperError.transcriptionFailed))
-                }
-            }
+        if result == 0 {
+            // Extract segments
+            let segments = self.extractSegments(context: context)
+            onComplete(.success(segments))
+        } else {
+            onComplete(.failure(WhisperError.transcriptionFailed))
         }
     }
 

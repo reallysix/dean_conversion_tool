@@ -16,6 +16,7 @@ settings:
       - "/opt/homebrew/Cellar/whisper-cpp/1.8.4/lib"
     HEADER_SEARCH_PATHS:
       - "/opt/homebrew/Cellar/whisper-cpp/1.8.4/include"
+      - "/opt/homebrew/Cellar/ggml/0.10.1/include"
 
 targets:
   DeanConversionTool:
@@ -48,6 +49,7 @@ targets:
           - "/opt/homebrew/Cellar/whisper-cpp/1.8.4/lib"
         HEADER_SEARCH_PATHS:
           - "/opt/homebrew/Cellar/whisper-cpp/1.8.4/include"
+          - "/opt/homebrew/Cellar/ggml/0.10.1/include"
         ENABLE_HARDENED_RUNTIME: YES
         ENABLE_APP_SANDBOX: NO
     info:

@@ -132,7 +132,6 @@ class ExportService {
 
             let timestamp = segment.displayTimestamp
             let emotion = segment.sentiment?.emotion.emoji ?? ""
-            let emotionClass = segment.sentiment?.emotion.rawValue ?? ""
 
             html += """
                         <div class="segment">

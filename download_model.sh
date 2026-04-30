@@ -9,6 +9,10 @@ MODEL_DIR="$HOME/Library/Application Support/DeanConversion/models"
 MODEL_FILE="ggml-large-v3.bin"
 MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin"
 
+# Proxy settings (uncomment if needed)
+PROXY="http://127.0.0.1:61199"
+PROXY_ARG="-x $PROXY"
+
 echo "Dean Conversion Tool - Model Downloader"
 echo "======================================="
 echo ""
@@ -28,8 +32,9 @@ echo "Downloading large-v3 model (~3.1GB)..."
 echo "This may take several minutes depending on your internet connection."
 echo ""
 
-# Download with progress
+# Download with progress and proxy
 curl -L --progress-bar \
+    $PROXY_ARG \
     -o "$MODEL_DIR/$MODEL_FILE" \
     "$MODEL_URL"
 

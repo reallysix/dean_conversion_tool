@@ -11,10 +11,7 @@ struct DeanConversionToolApp: App {
             // Add custom menu commands
             CommandGroup(after: .newItem) {
                 Button("Import Audio/Video...") {
-                    NSApp.keyWindow?.contentView?.tryToPerform(
-                        #selector(NSResponder.openDocument(_:)),
-                        with: nil
-                    )
+                    // Open file dialog will be handled by the view
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
             }

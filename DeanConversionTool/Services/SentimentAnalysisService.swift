@@ -15,7 +15,6 @@ class SentimentAnalysisService {
 
         tagger.string = text
 
-        let range = text.startIndex..<text.endIndex
         let (tag, _) = tagger.tag(at: text.startIndex, unit: .paragraph, scheme: .sentimentScore)
 
         let score = Double(tag?.rawValue ?? "0") ?? 0.0

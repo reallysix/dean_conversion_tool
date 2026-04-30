@@ -50,8 +50,7 @@ class AudioPreprocessingService {
                 let data = handle.availableData
                 if let output = String(data: data, encoding: .utf8) {
                     // Parse ffmpeg progress output
-                    if let timeMatch = output.range(of: "time=(\\d{2}):(\\d{2}):(\\d{2}\\.\\d{2})", options: .regularExpression) {
-                        let timeStr = String(output[timeMatch.range])
+                    if let _ = output.range(of: "time=(\\d{2}):(\\d{2}):(\\d{2}\\.\\d{2})", options: .regularExpression) {
                         // Extract time and calculate progress (simplified)
                         progressHandler(0.5) // Placeholder progress
                     }
