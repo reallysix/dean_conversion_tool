@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew --version)",
+      "Bash(ffmpeg -version)",
+      "Bash(whisper --version)",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(python3 -c \"import whisper; print\\(f'Whisper version: {whisper.__version__}'\\)\")",
+      "Bash(brew list:*)",
+      "Bash(pip3 list:*)",
+      "Bash(sysctl -n machdep.cpu.brand_string)",
+      "Bash(sysctl -n hw.memsize)",
+      "Read(//Users/olivia/MyObjects/2026Projects/dean_conversion_tool/{print $1/1024/1024/**)",
+      "Bash(xcode-select -p)",
+      "Bash(xcodebuild -version)",
+      "Bash(swift --version)",
+      "Bash(pip3 show:*)",
+      "Bash(brew search:*)",
+      "Bash(brew info:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggerganov/whisper.cpp/master/examples/whisper.swift/README.md\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggerganov/whisper.cpp/master/bindings/swift/README.md\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/argmaxinc/WhisperKit/main/README.md\")"
+    ]
+  }
+}

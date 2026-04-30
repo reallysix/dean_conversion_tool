@@ -1,0 +1,88 @@
+name: DeanConversionTool
+options:
+  bundleIdPrefix: com.dean
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_OBJC_BRIDGING_HEADER: DeanConversionTool/Bridging-Header.h
+    OTHER_LDFLAGS:
+      - "-L/opt/homebrew/Cellar/whisper-cpp/1.8.4/lib"
+      - "-lwhisper"
+    LIBRARY_SEARCH_PATHS:
+      - "/opt/homebrew/Cellar/whisper-cpp/1.8.4/lib"
+    HEADER_SEARCH_PATHS:
+      - "/opt/homebrew/Cellar/whisper-cpp/1.8.4/include"
+
+targets:
+  DeanConversionTool:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: DeanConversionTool
+        excludes:
+          - "**/.DS_Store"
+    resources:
+      - path: PythonHelpers
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_NAME: Dean Conversion Tool
+        PRODUCT_BUNDLE_IDENTIFIER: com.dean.conversiontool
+        INFOPLIST_FILE: DeanConversionTool/Info.plist
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+          - "/opt/homebrew/Cellar/whisper-cpp/1.8.4/lib"
+        SWIFT_OBJC_BRIDGING_HEADER: DeanConversionTool/Bridging-Header.h
+        OTHER_LDFLAGS:
+          - "-L/opt/homebrew/Cellar/whisper-cpp/1.8.4/lib"
+          - "-lwhisper"
+        LIBRARY_SEARCH_PATHS:
+          - "/opt/homebrew/Cellar/whisper-cpp/1.8.4/lib"
+        HEADER_SEARCH_PATHS:
+          - "/opt/homebrew/Cellar/whisper-cpp/1.8.4/include"
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_APP_SANDBOX: NO
+    info:
+      path: DeanConversionTool/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: en
+        CFBundleDisplayName: "Dean Conversion Tool"
+        CFBundleExecutable: DeanConversionTool
+        CFBundleIdentifier: com.dean.conversiontool
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: DeanConversionTool
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: 1
+        LSMinimumSystemVersion: "14.0"
+        NSHighResolutionCapable: true
+        NSHumanReadableCopyright: "Copyright © 2026 Dean. All rights reserved."
+        NSMicrophoneUsageDescription: "Dean Conversion Tool needs microphone access for audio transcription."
+        NSScreenCaptureUsageDescription: "Dean Conversion Tool needs screen recording access for video transcription."
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Audio File
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.audio
+              - com.microsoft.waveform-audio
+              - public.mp3
+              - com.apple.m4a-audio
+              - org.xiph.ogg-vorbis
+              - public.flac-audio
+          - CFBundleTypeName: Video File
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.movie
+              - com.apple.quicktime-movie
+              - public.mpeg-4
+              - org.matroska.mkv
