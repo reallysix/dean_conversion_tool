@@ -69,21 +69,8 @@ class ExportService {
             }
 
             let timestamp = segment.displayTimestamp
-            let emotion = segment.sentiment?.emotion.emoji ?? ""
-            md += "**\(timestamp)** \(emotion) \(segment.text)\n\n"
+            md += "**\(timestamp)** \(segment.text)\n\n"
         }
-
-        // Add sentiment summary
-        let sentimentService = SentimentAnalysisService()
-        let summary = sentimentService.getSummary(for: transcript)
-
-        md += "---\n\n"
-        md += "## 情感分析摘要\n\n"
-        md += "- 平均情感得分: \(String(format: "%.2f", summary.averageScore))\n"
-        md += "- 积极内容: \(summary.positivePercentage)%\n"
-        md += "- 消极内容: \(summary.negativePercentage)%\n"
-        md += "- 中性内容: \(summary.neutralPercentage)%\n"
-        md += "- 主要情感: \(summary.dominantEmotion.emoji) \(summary.dominantEmotion.rawValue)\n\n"
 
         return md
     }
@@ -104,13 +91,7 @@ class ExportService {
                 .segment:hover { background: #e8e8e8; }
                 .timestamp { color: #007AFF; font-weight: bold; margin-right: 10px; }
                 .speaker { color: #666; font-weight: bold; margin-right: 10px; }
-                .emotion { margin-right: 10px; }
                 .text { margin-top: 5px; }
-                .summary { margin-top: 30px; padding: 15px; background: #e8f4fd; border-radius: 8px; }
-                .summary h3 { margin-top: 0; }
-                .positive { color: #34C759; }
-                .negative { color: #FF3B30; }
-                .neutral { color: #8E8E93; }
             </style>
         </head>
         <body>
@@ -131,12 +112,10 @@ class ExportService {
             }
 
             let timestamp = segment.displayTimestamp
-            let emotion = segment.sentiment?.emotion.emoji ?? ""
 
             html += """
                         <div class="segment">
                             <span class="timestamp">\(timestamp)</span>
-                            <span class="emotion">\(emotion)</span>
                             <span class="speaker">\(segment.speaker ?? "")</span>
                             <div class="text">\(segment.text)</div>
                         </div>
@@ -144,19 +123,7 @@ class ExportService {
             """
         }
 
-        // Add sentiment summary
-        let sentimentService = SentimentAnalysisService()
-        let summary = sentimentService.getSummary(for: transcript)
-
         html += """
-                    <div class="summary">
-                        <h3>情感分析摘要</h3>
-                        <p>平均情感得分: \(String(format: "%.2f", summary.averageScore))</p>
-                        <p>积极内容: <span class="positive">\(summary.positivePercentage)%</span></p>
-                        <p>消极内容: <span class="negative">\(summary.negativePercentage)%</span></p>
-                        <p>中性内容: <span class="neutral">\(summary.neutralPercentage)%</span></p>
-                        <p>主要情感: \(summary.dominantEmotion.emoji) \(summary.dominantEmotion.rawValue)</p>
-                    </div>
                 </body>
                 </html>
         """
@@ -217,6 +184,16 @@ enum ExportFormat: String, CaseIterable {
     case markdown = "markdown"
     case html = "html"
     case json = "json"
+
+    var displayName: String {
+        switch self {
+        case .srt: return "SRT 字幕文件"
+        case .txt: return "纯文本"
+        case .markdown: return "Markdown"
+        case .html: return "HTML 网页"
+        case .json: return "JSON 数据"
+        }
+    }
 }
 
 /// Errors that can occur during export
@@ -228,11 +205,11 @@ enum ExportError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidPath:
-            return "Invalid output path"
+            return "输出路径无效"
         case .writeFailed(let error):
-            return "Failed to write file: \(error.localizedDescription)"
+            return "文件写入失败：\(error.localizedDescription)"
         case .encodingFailed:
-            return "Failed to encode transcript"
+            return "文稿编码失败"
         }
     }
 }

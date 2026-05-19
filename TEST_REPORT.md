@@ -11,7 +11,6 @@
 Dean Conversion Tool 是一个音视频转文字稿的 macOS 应用程序，集成了以下核心功能：
 - Whisper.cpp 本地 AI 转写（Metal GPU 加速）
 - pyannote.audio 说话人识别
-- Apple NaturalLanguage 情感分析
 - 多格式导出（SRT, TXT, Markdown, HTML, JSON）
 
 ---
@@ -267,7 +266,7 @@ Dean Conversion Tool 的核心功能已全部通过测试：
 ### 可选优化
 1. 配置说话人识别的 HuggingFace token
 2. 调整模型大小以平衡性能和准确性
-3. 自定义情感分析阈值
+3. 根据常用流程补充真实音视频样本测试
 
 ### 反馈渠道
 如有问题或建议，请通过以下方式联系：

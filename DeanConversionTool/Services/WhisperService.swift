@@ -1,154 +1,202 @@
 import Foundation
 
-/// Service for audio transcription using whisper.cpp
-/// This service wraps the whisper.cpp library via Bridging Header
+/// Service for audio transcription using whisper-cli command line tool
+/// This approach runs whisper as a subprocess to avoid library integration issues
 class WhisperService {
-    private var context: OpaquePointer?
-    private let sentimentService = SentimentAnalysisService()
+    private let whisperCLIPath = "/opt/homebrew/bin/whisper-cli"
 
-    /// Check if a model is loaded
+    /// Check if whisper-cli is available
     var isModelLoaded: Bool {
-        return context != nil
+        return FileManager.default.fileExists(atPath: whisperCLIPath)
     }
 
-    /// Deinitialize whisper context
-    deinit {
-        if let context = context {
-            whisper_free(context)
-        }
+    /// Get the path to the whisper model
+    private func getModelPath() -> String {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let modelDir = appSupport.appendingPathComponent("DeanConversion/models")
+        return modelDir.appendingPathComponent("ggml-large-v3.bin").path
     }
 
-    /// Load the whisper model from file
-    /// - Parameter modelPath: Path to the GGML model file
-    /// - Throws: WhisperError if loading fails
-    func loadModel(modelPath: String) throws {
-        guard FileManager.default.fileExists(atPath: modelPath) else {
-            throw WhisperError.modelNotFound(modelPath)
-        }
-
-        // Free existing context if any
-        if let context = context {
-            whisper_free(context)
-        }
-
-        var params = whisper_context_default_params()
-        params.use_gpu = false  // Disable GPU to avoid Metal initialization issues
-
-        guard let newContext = whisper_init_from_file_with_params(modelPath, params) else {
-            throw WhisperError.modelLoadFailed
-        }
-
-        self.context = newContext
-    }
-
-    /// Transcribe an audio file
+    /// Transcribe an audio file using whisper-cli
     /// - Parameters:
     ///   - audioPath: Path to the WAV audio file (16kHz, mono, 16-bit PCM)
     ///   - language: Optional language code (e.g., "zh", "en", "ja")
     ///   - onProgress: Optional progress callback (0.0 to 1.0)
     ///   - onComplete: Completion handler with result or error
     func transcribe(audioPath: String, language: String? = nil, onProgress: ((Double) -> Void)? = nil, onComplete: @escaping (Result<[TranscriptSegment], Error>) -> Void) {
-        guard let context = context else {
+        guard FileManager.default.fileExists(atPath: whisperCLIPath) else {
             onComplete(.failure(WhisperError.modelNotLoaded))
             return
         }
 
-        // Configure whisper parameters
-        var params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY)
-        params.print_special = false
-        params.print_progress = false
-        params.print_realtime = false
-        params.print_timestamps = false
-        params.translate = false
-        params.single_segment = false
-        params.no_timestamps = false
-        params.n_threads = Int32(max(1, ProcessInfo.processInfo.activeProcessorCount - 2))
-
-        // Load audio data
-        guard let audioData = self.loadAudio(path: audioPath) else {
-            onComplete(.failure(WhisperError.audioLoadFailed))
+        let modelPath = getModelPath()
+        guard FileManager.default.fileExists(atPath: modelPath) else {
+            onComplete(.failure(WhisperError.modelNotFound(modelPath)))
             return
         }
 
-        // Run inference
-        let result = audioData.withUnsafeBufferPointer { buffer in
-            whisper_full(context, params, buffer.baseAddress, Int32(audioData.count))
-        }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
 
-        if result == 0 {
-            // Extract segments
-            let segments = self.extractSegments(context: context)
-            onComplete(.success(segments))
-        } else {
-            onComplete(.failure(WhisperError.transcriptionFailed))
+            // Configure whisper-cli arguments
+            var arguments = [
+                "-m", modelPath,
+                "-f", audioPath,
+                "-oj",  // Output JSON for structured data
+                "--no-prints",
+                "-l", language ?? "auto"  // Auto-detect language by default
+            ]
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: self.whisperCLIPath)
+            process.arguments = arguments
+
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+
+                guard process.terminationStatus == 0 else {
+                    let errorOutput = String(data: errorData, encoding: .utf8) ?? "Unknown error"
+                    DispatchQueue.main.async {
+                        onComplete(.failure(WhisperError.transcriptionFailed))
+                    }
+                    return
+                }
+
+                // Parse the JSON output
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+                let segments = self.parseWhisperOutput(output)
+
+                DispatchQueue.main.async {
+                    onComplete(.success(segments))
+                }
+
+            } catch {
+                DispatchQueue.main.async {
+                    onComplete(.failure(WhisperError.processFailed(error)))
+                }
+            }
         }
     }
 
-    /// Load audio file and convert to Float32 array for whisper.cpp
-    private func loadAudio(path: String) -> [Float]? {
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
-            return nil
+    /// Detected language from last transcription
+    private(set) var detectedLanguage: String?
+
+    /// Parse whisper-cli JSON output
+    private func parseWhisperOutput(_ output: String) -> [TranscriptSegment] {
+        // Find JSON data in output (whisper-cli outputs other info before JSON)
+        guard let jsonData = output.data(using: .utf8) else {
+            return []
         }
 
-        // WAV header is 44 bytes, skip it
-        guard data.count > 44 else { return nil }
+        do {
+            guard let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let result = json["result"] as? [[String: Any]] else {
+                // Try to parse as plain text if JSON fails
+                return parsePlainTextOutput(output)
+            }
 
-        let audioData = data[44...]
-        let sampleCount = audioData.count / 2  // 16-bit = 2 bytes per sample
+            // Extract detected language
+            if let lang = json["language"] as? String {
+                self.detectedLanguage = lang
+            }
 
-        var floatArray = [Float](repeating: 0, count: sampleCount)
-        for i in 0..<sampleCount {
-            let byteIndex = i * 2
-            let sample = Int16(audioData[byteIndex]) | (Int16(audioData[byteIndex + 1]) << 8)
-            floatArray[i] = Float(sample) / 32768.0
+            var segments: [TranscriptSegment] = []
+            for item in result {
+                guard let timestamps = item["timestamps"] as? [String: Any],
+                      let from = timestamps["from"] as? Double,
+                      let to = timestamps["to"] as? Double,
+                      let text = item["text"] as? String else {
+                    continue
+                }
+
+                let segment = TranscriptSegment(
+                    startTime: from,
+                    endTime: to,
+                    text: text.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+                segments.append(segment)
+            }
+
+            return segments
+
+        } catch {
+            return parsePlainTextOutput(output)
         }
-
-        return floatArray
     }
 
-    /// Extract transcript segments from whisper context
-    private func extractSegments(context: OpaquePointer) -> [TranscriptSegment] {
-        var segments = [TranscriptSegment]()
-        let nSegments = whisper_full_n_segments(context)
+    /// Parse plain text output as fallback
+    private func parsePlainTextOutput(_ output: String) -> [TranscriptSegment] {
+        var segments: [TranscriptSegment] = []
+        let lines = output.components(separatedBy: .newlines)
 
-        for i in 0..<nSegments {
-            guard let textPtr = whisper_full_get_segment_text(context, i) else { continue }
+        for line in lines {
+            // Match pattern: [00:00:00.000 --> 00:00:05.000]  Text here
+            let pattern = "\\[(\\d{2}):(\\d{2}):(\\d{2}\\.\\d{3})\\s*-->\\s*(\\d{2}):(\\d{2}):(\\d{2}\\.\\d{3})\\]\\s*(.*)"
+            guard let regex = try? NSRegularExpression(pattern: pattern),
+                  let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else {
+                continue
+            }
 
-            let startTime = whisper_full_get_segment_t0(context, i)
-            let endTime = whisper_full_get_segment_t1(context, i)
+            guard let startRange = Range(match.range(at: 1), in: line),
+                  let startMin = Range(match.range(at: 2), in: line),
+                  let startSec = Range(match.range(at: 3), in: line),
+                  let endRange = Range(match.range(at: 4), in: line),
+                  let endMin = Range(match.range(at: 5), in: line),
+                  let endSec = Range(match.range(at: 6), in: line),
+                  let textRange = Range(match.range(at: 7), in: line) else {
+                continue
+            }
 
-            let text = String(cString: textPtr)
-            let startSeconds = Double(startTime) / 100.0  // whisper uses centiseconds
-            let endSeconds = Double(endTime) / 100.0
+            let startHours = Double(line[startRange]) ?? 0
+            let startMinutes = Double(line[startMin]) ?? 0
+            let startSeconds = Double(line[startSec]) ?? 0
+            let startTime = startHours * 3600 + startMinutes * 60 + startSeconds
 
-            let segment = TranscriptSegment(
-                startTime: startSeconds,
-                endTime: endSeconds,
-                text: text.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
+            let endHours = Double(line[endRange]) ?? 0
+            let endMinutes = Double(line[endMin]) ?? 0
+            let endSeconds = Double(line[endSec]) ?? 0
+            let endTime = endHours * 3600 + endMinutes * 60 + endSeconds
 
-            segments.append(segment)
+            let text = String(line[textRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if !text.isEmpty {
+                let segment = TranscriptSegment(
+                    startTime: startTime,
+                    endTime: endTime,
+                    text: text
+                )
+                segments.append(segment)
+            }
         }
 
         return segments
     }
 
-    /// Transcribe with sentiment analysis
-    func transcribeWithSentiment(audioPath: String, language: String? = nil, onProgress: ((Double) -> Void)? = nil, onComplete: @escaping (Result<Transcript, Error>) -> Void) {
+    /// Transcribe and return a Transcript object
+    func transcribeWithMetadata(audioPath: String, language: String? = nil, onProgress: ((Double) -> Void)? = nil, onComplete: @escaping (Result<Transcript, Error>) -> Void) {
         transcribe(audioPath: audioPath, language: language, onProgress: onProgress) { result in
             switch result {
             case .success(let segments):
-                // Analyze sentiment for each segment
-                let segmentsWithSentiment = self.sentimentService.analyzeSegments(segments)
-
                 // Get audio duration
                 let audioService = AudioPreprocessingService()
                 let duration = (try? audioService.getAudioDuration(path: audioPath)) ?? 0
 
+                // Use detected language if not explicitly specified
+                let transcriptLanguage = language ?? self.detectedLanguage
+
                 let transcript = Transcript(
                     sourceURL: URL(fileURLWithPath: audioPath),
-                    segments: segmentsWithSentiment,
-                    language: language,
+                    segments: segments,
+                    language: transcriptLanguage,
                     duration: duration
                 )
 
@@ -168,19 +216,22 @@ enum WhisperError: LocalizedError {
     case modelNotLoaded
     case audioLoadFailed
     case transcriptionFailed
+    case processFailed(Error)
 
     var errorDescription: String? {
         switch self {
         case .modelNotFound(let path):
-            return "Model file not found: \(path)"
+            return "模型文件未找到：\(path)"
         case .modelLoadFailed:
-            return "Failed to load whisper model"
+            return "Whisper 模型加载失败"
         case .modelNotLoaded:
-            return "No model loaded. Call loadModel() first"
+            return "whisper-cli 未找到。请安装 whisper-cpp：brew install whisper-cpp"
         case .audioLoadFailed:
-            return "Failed to load audio file"
+            return "音频文件加载失败"
         case .transcriptionFailed:
-            return "Transcription failed"
+            return "转写失败"
+        case .processFailed(let error):
+            return "进程执行失败：\(error.localizedDescription)"
         }
     }
 }

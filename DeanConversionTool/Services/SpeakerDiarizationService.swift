@@ -4,6 +4,7 @@ import Foundation
 class SpeakerDiarizationService {
     private let pythonPath = "/opt/homebrew/bin/python3"
     private let scriptPath: String
+    private var _isAvailable: Bool?
 
     init() {
         // Get the path to the Python helper script
@@ -16,13 +17,19 @@ class SpeakerDiarizationService {
         }
     }
 
-    /// Check if Python and required packages are available
+    /// Check if Python and required packages are available (cached after first call)
     var isAvailable: Bool {
+        if let cached = _isAvailable { return cached }
+        let result = checkAvailability()
+        _isAvailable = result
+        return result
+    }
+
+    private func checkAvailability() -> Bool {
         guard FileManager.default.fileExists(atPath: pythonPath) else {
             return false
         }
 
-        // Check if pyannote.audio is installed
         let process = Process()
         process.executableURL = URL(fileURLWithPath: pythonPath)
         process.arguments = ["-c", "import pyannote.audio; print('ok')"]
@@ -56,7 +63,7 @@ class SpeakerDiarizationService {
             throw SpeakerDiarizationError.scriptNotFound(scriptPath)
         }
 
-        progressHandler?("Starting speaker diarization...")
+        progressHandler?("正在启动说话人识别...")
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: pythonPath)
@@ -76,7 +83,7 @@ class SpeakerDiarizationService {
         errorPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
             if let errorOutput = String(data: data, encoding: .utf8), !errorOutput.isEmpty {
-                progressHandler?("Processing: \(errorOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
+                progressHandler?("处理中：\(errorOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
             }
         }
 
@@ -165,17 +172,17 @@ enum SpeakerDiarizationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .pythonNotFound:
-            return "Python not found. Please install Python 3"
+            return "Python 未找到。请安装 Python 3"
         case .scriptNotFound(let path):
-            return "Diarization script not found: \(path)"
+            return "说话人识别脚本未找到：\(path)"
         case .diarizationFailed(let details):
-            return "Speaker diarization failed: \(details)"
+            return "说话人识别失败：\(details)"
         case .processFailed(let error):
-            return "Process failed: \(error.localizedDescription)"
+            return "进程执行失败：\(error.localizedDescription)"
         case .invalidOutput:
-            return "Invalid output from diarization script"
+            return "说话人识别脚本输出无效"
         case .parsingFailed(let error):
-            return "Failed to parse diarization output: \(error.localizedDescription)"
+            return "解析说话人识别结果失败：\(error.localizedDescription)"
         }
     }
 }

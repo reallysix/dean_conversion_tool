@@ -1,46 +1,90 @@
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
 
-/// Main content view with NavigationSplitView layout
 struct ContentView: View {
     @StateObject private var viewModel = TranscriptViewModel()
-    @State private var columnVisibility = NavigationSplitViewVisibility.automatic
     @State private var isDragOver = false
+    @State private var selectedPanel: SidePanel = .transcript
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            // Sidebar
-            SidebarView(viewModel: viewModel)
-        } detail: {
-            // Main content area
-            DetailView(viewModel: viewModel)
+        HStack(spacing: 0) {
+            // Left nav rail
+            NavSidebar(viewModel: viewModel, selectedPanel: $selectedPanel)
+
+            Rectangle()
+                .fill(AppTheme.border)
+                .frame(width: 1)
+
+            // Center + Right stacked
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    // Center content - both views always present, toggle opacity
+                    ZStack {
+                        TranscriptContainerView(viewModel: viewModel)
+                            .opacity(selectedPanel == .transcript ? 1 : 0)
+                            .allowsHitTesting(selectedPanel == .transcript)
+
+                        EmbeddedSettingsView()
+                            .opacity(selectedPanel == .settings ? 1 : 0)
+                            .allowsHitTesting(selectedPanel == .settings)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+
+                    Rectangle()
+                        .fill(AppTheme.border)
+                        .frame(width: 1)
+
+                    // Right properties panel
+                    PropertiesPanel(viewModel: viewModel)
+                        .frame(width: AppTheme.propertiesPanelWidth)
+                }
+
+                // Bottom bar
+                Rectangle()
+                    .fill(AppTheme.border)
+                    .frame(height: 1)
+                BottomBar(viewModel: viewModel)
+                    .frame(height: AppTheme.bottomBarHeight)
+            }
         }
-        .navigationTitle("Dean Conversion Tool")
-        .frame(minWidth: 800, minHeight: 600)
+        .frame(minWidth: 960, minHeight: 600)
+        .background(AppTheme.background)
         .onDrop(of: [.fileURL], isTargeted: $isDragOver) { providers in
             handleDrop(providers: providers)
         }
-        .overlay {
-            if isDragOver {
-                DropOverlayView()
-            }
+        .sheet(isPresented: $viewModel.showBatchSetup) {
+            BatchSetupSheet(viewModel: viewModel)
+        }
+        .sheet(isPresented: $viewModel.showBatchSummary) {
+            BatchSummarySheet(viewModel: viewModel)
         }
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first else { return false }
+        let supportedExtensions = ["mp3", "wav", "m4a", "aac", "flac", "ogg", "wma",
+                                  "mp4", "mov", "avi", "mkv", "webm", "m4v"]
+        var urls: [URL] = []
+        let group = DispatchGroup()
 
-        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, error in
-            guard let data = item as? Data,
-                  let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+        for provider in providers {
+            group.enter()
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
+                defer { group.leave() }
+                guard let data = item as? Data,
+                      let url = URL(dataRepresentation: data, relativeTo: nil),
+                      supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
+                urls.append(url)
+            }
+        }
 
-            let supportedExtensions = ["mp3", "wav", "m4a", "aac", "flac", "ogg", "wma",
-                                      "mp4", "mov", "avi", "mkv", "webm", "m4v"]
-
-            if supportedExtensions.contains(url.pathExtension.lowercased()) {
-                DispatchQueue.main.async {
-                    viewModel.processFile(url: url)
-                }
+        group.notify(queue: .main) {
+            if urls.count == 1 {
+                viewModel.processFile(url: urls[0])
+            } else if urls.count > 1 {
+                viewModel.batchQueue = urls
+                viewModel.showBatchSetup = true
             }
         }
 
@@ -48,283 +92,241 @@ struct ContentView: View {
     }
 }
 
-/// Sidebar view with file list and controls
-struct SidebarView: View {
+// MARK: - Transcript Container
+
+struct TranscriptContainerView: View {
     @ObservedObject var viewModel: TranscriptViewModel
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header with status
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "waveform")
-                        .font(.title2)
-                        .foregroundColor(.blue)
-                    Text("Audio Files")
-                        .font(.headline)
-                    Spacer()
-                }
-
-                // System status
-                HStack {
-                    StatusIndicator(
-                        label: "Whisper",
-                        isAvailable: viewModel.isModelLoaded
-                    )
-                    StatusIndicator(
-                        label: "Python",
-                        isAvailable: viewModel.isPythonAvailable
-                    )
-                    StatusIndicator(
-                        label: "FFmpeg",
-                        isAvailable: viewModel.isFFmpegAvailable
-                    )
-                }
-                .font(.caption)
-            }
-            .padding()
-
-            Divider()
-
-            // File operations
-            VStack(spacing: 12) {
-                // Import button
-                Button(action: importFile) {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Import Audio/Video")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.borderedProminent)
-
-                // Quick actions
-                if viewModel.transcript != nil {
-                    Divider()
-
-                    HStack(spacing: 12) {
-                        Button(action: { viewModel.selectAllSegments() }) {
-                            Label("Select All", systemImage: "checkmark.circle")
-                        }
-                        .help("Select all segments")
-
-                        Button(action: { viewModel.deselectAllSegments() }) {
-                            Label("Deselect All", systemImage: "circle")
-                        }
-                        .help("Deselect all segments")
-
-                        Spacer()
-                    }
-                    .font(.caption)
-
-                    // Copy selected
-                    if !viewModel.selectedSegments.isEmpty {
-                        Button(action: { viewModel.copySelectedSegments() }) {
-                            Label("Copy Selected (\(viewModel.selectedSegments.count))",
-                                  systemImage: "doc.on.doc")
-                        }
-                        .help("Copy selected segments to clipboard")
-                    }
-                }
-
-                Spacer()
-            }
-            .padding()
-        }
-        .frame(minWidth: 200)
-    }
-
-    private func importFile() {
-        let panel = NSOpenPanel()
-        panel.title = "Import Audio or Video File"
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [
-            .audio, .movie,
-            UTType(filenameExtension: "mp3")!,
-            UTType(filenameExtension: "wav")!,
-            UTType(filenameExtension: "m4a")!,
-            UTType(filenameExtension: "flac")!,
-            UTType(filenameExtension: "mp4")!,
-            UTType(filenameExtension: "mov")!,
-            UTType(filenameExtension: "mkv")!
-        ]
-
-        panel.begin { result in
-            guard result == .OK, let url = panel.url else { return }
-            viewModel.processFile(url: url)
-        }
-    }
-}
-
-/// Status indicator for system components
-struct StatusIndicator: View {
-    let label: String
-    let isAvailable: Bool
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(isAvailable ? Color.green : Color.red)
-                .frame(width: 8, height: 8)
-            Text(label)
-        }
-    }
-}
-
-/// Main detail view with transcript display
-struct DetailView: View {
-    @ObservedObject var viewModel: TranscriptViewModel
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Loading indicator
             if viewModel.isLoading {
                 LoadingView(message: viewModel.loadingMessage, progress: viewModel.progress)
             }
 
-            // Error display
             if let error = viewModel.error {
-                ErrorBanner(message: error) {
-                    viewModel.error = nil
-                }
+                ErrorBanner(message: error) { viewModel.error = nil }
             }
 
-            // Main content
+            if let player = viewModel.player, viewModel.isVideoFile {
+                CompactVideoPlayerView(player: player)
+                Rectangle().fill(AppTheme.border).frame(height: 1)
+            }
+
+            TranscriptToolbar(viewModel: viewModel)
+
             if let transcript = viewModel.transcript {
-                TranscriptView(viewModel: viewModel, transcript: transcript)
+                TranscriptView(viewModel: viewModel, selectionManager: viewModel.selectionManager, transcript: transcript)
             } else if !viewModel.isLoading {
-                WelcomeView()
+                WelcomeView(viewModel: viewModel)
             }
         }
     }
 }
 
-/// Welcome view when no transcript is loaded
-struct WelcomeView: View {
+// MARK: - Embedded Settings
+
+struct EmbeddedSettingsView: View {
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "waveform.circle.fill")
-                .font(.system(size: 80))
-                .foregroundColor(.blue)
+        VStack(spacing: 0) {
+            Text("设置")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+                .padding(.bottom, 16)
 
-            Text("Dean Conversion Tool")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Text("Audio/Video to Transcript Converter")
-                .font(.title3)
-                .foregroundColor(.secondary)
-
-            Text("Drag & drop an audio or video file to get started")
-                .foregroundColor(.secondary)
-
-            VStack(alignment: .leading, spacing: 8) {
-                FeatureRow(icon: "text.bubble", title: "Transcription", description: "Powered by Whisper AI")
-                FeatureRow(icon: "person.2", title: "Speaker Diarization", description: "Identify different speakers")
-                FeatureRow(icon: "face.smiling", title: "Emotion Analysis", description: "Detect sentiment in speech")
-                FeatureRow(icon: "square.and.arrow.up", title: "Export", description: "SRT, TXT, Markdown, HTML, JSON")
-            }
-            .padding(.top, 20)
+            SettingsView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.horizontal, 24)
         }
-        .padding()
+        .background(AppTheme.background)
     }
 }
 
-/// Feature row for welcome view
-struct FeatureRow: View {
+// MARK: - Welcome View
+
+struct WelcomeView: View {
+    @ObservedObject var viewModel: TranscriptViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            VStack(spacing: 8) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 40))
+                    .foregroundColor(AppTheme.accent)
+                    .padding(.bottom, 12)
+
+                Text("语音转文字工具")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+
+                Text("拖拽音频或视频文件到此处开始转写")
+                    .font(.system(size: 14))
+                    .foregroundColor(AppTheme.textSecondary)
+                    .padding(.bottom, 16)
+
+                Button(action: { openFilePicker() }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 14))
+                        Text("选择文件")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(AppTheme.accent)
+                    .cornerRadius(AppTheme.cornerRadiusMedium)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: { openBatchPicker() }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 14))
+                        Text("批量处理")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .foregroundColor(AppTheme.accent)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(AppTheme.accent.opacity(0.1))
+                    .cornerRadius(AppTheme.cornerRadiusMedium)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.bottom, 40)
+
+            HStack(spacing: 16) {
+                WelcomeCard(icon: "waveform", title: "语音转写", description: "基于 Whisper AI\n本地离线转写")
+                WelcomeCard(icon: "person.2", title: "说话人识别", description: "自动识别\n不同说话人")
+                WelcomeCard(icon: "square.and.arrow.up", title: "多格式导出", description: "SRT / TXT / Markdown\nHTML / JSON")
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.background)
+    }
+
+    private func openFilePicker() {
+        let panel = NSOpenPanel()
+        panel.title = "选择音频或视频文件"
+        panel.allowedContentTypes = [
+            .audio, .mp3, .wav, .aiff, .mpeg4Audio,
+            .movie, .mpeg4Movie, .quickTimeMovie
+        ]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+
+        if panel.runModal() == .OK, let url = panel.url {
+            viewModel.processFile(url: url)
+        }
+    }
+
+    private func openBatchPicker() {
+        let panel = NSOpenPanel()
+        panel.title = "选择多个音频或视频文件"
+        panel.allowedContentTypes = [
+            .audio, .mp3, .wav, .aiff, .mpeg4Audio,
+            .movie, .mpeg4Movie, .quickTimeMovie
+        ]
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+
+        if panel.runModal() == .OK, !panel.urls.isEmpty {
+            viewModel.batchQueue = panel.urls
+            viewModel.showBatchSetup = true
+        }
+    }
+}
+
+struct WelcomeCard: View {
     let icon: String
     let title: String
     let description: String
 
     var body: some View {
-        HStack {
+        VStack(spacing: 10) {
             Image(systemName: icon)
-                .frame(width: 24)
-                .foregroundColor(.blue)
-            VStack(alignment: .leading) {
-                Text(title)
-                    .font(.headline)
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
+                .font(.system(size: 18))
+                .foregroundColor(AppTheme.accent)
+                .frame(width: 40, height: 40)
+                .background(AppTheme.accent.opacity(0.12))
+                .cornerRadius(AppTheme.cornerRadiusMedium)
+
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary)
+
+            Text(description)
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
         }
+        .frame(width: 160, height: 140)
+        .background(AppTheme.surface)
+        .cornerRadius(AppTheme.cornerRadiusMedium)
     }
 }
 
-/// Loading view with progress
+// MARK: - Loading View
+
 struct LoadingView: View {
     let message: String
     let progress: Double
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             ProgressView(value: progress)
                 .progressViewStyle(.linear)
+                .tint(AppTheme.accent)
 
             HStack {
-                ProgressView()
-                    .scaleEffect(0.8)
                 Text(message)
-                    .font(.callout)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.textSecondary)
                 Spacer()
                 Text("\(Int(progress * 100))%")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(AppTheme.textSecondary)
             }
         }
-        .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(AppTheme.surface)
     }
 }
 
-/// Error banner
+// MARK: - Error Banner
+
 struct ErrorBanner: View {
     let message: String
     let onDismiss: () -> Void
 
     var body: some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.orange)
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.danger)
             Text(message)
-                .font(.callout)
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.danger)
             Spacer()
             Button(action: onDismiss) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.secondary)
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(AppTheme.danger)
             }
             .buttonStyle(.plain)
         }
-        .padding()
-        .background(Color.orange.opacity(0.2))
-    }
-}
-
-/// Drop overlay when dragging files
-struct DropOverlayView: View {
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.3)
-            VStack {
-                Image(systemName: "arrow.down.doc.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.white)
-                Text("Drop to Import")
-                    .font(.title2)
-                    .foregroundColor(.white)
-            }
-            .padding(40)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.blue.opacity(0.8))
-            )
-        }
-        .ignoresSafeArea()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(AppTheme.danger.opacity(0.1))
     }
 }
 

@@ -1,462 +1,266 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
-/// Main transcript display view
 struct TranscriptView: View {
     @ObservedObject var viewModel: TranscriptViewModel
+    @ObservedObject var selectionManager: SelectionManager
     let transcript: Transcript
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Toolbar
-            TranscriptToolbar(viewModel: viewModel, transcript: transcript)
-
-            Divider()
-
-            // Main content area
-            HSplitView {
-                // Transcript segments list
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(viewModel.filteredSegments) { segment in
-                            SegmentRow(
-                                segment: segment,
-                                isSelected: viewModel.selectedSegments.contains(segment.id),
-                                onToggle: { toggleSelection(segment.id) }
-                            )
-                        }
-                    }
-                    .padding()
-                }
-
-                // Sentiment summary sidebar
-                if let summary = viewModel.emotionSummary {
-                    SentimentSummaryView(summary: summary, transcript: transcript)
-                        .frame(width: 250)
-                }
-            }
-        }
-    }
-
-    private func toggleSelection(_ id: UUID) {
-        if viewModel.selectedSegments.contains(id) {
-            viewModel.selectedSegments.remove(id)
-        } else {
-            viewModel.selectedSegments.insert(id)
-        }
+        SpeakerGroupedListView(
+            segments: viewModel.filteredSegments,
+            selectedIDs: selectionManager.selectedIDs,
+            onToggle: { id in selectionManager.toggle(id) },
+            onSeek: viewModel.player != nil ? { time in viewModel.seekTo(time: time) } : nil
+        )
     }
 }
 
-/// Toolbar for transcript operations
+// MARK: - Toolbar
+
 struct TranscriptToolbar: View {
     @ObservedObject var viewModel: TranscriptViewModel
-    let transcript: Transcript
 
     var body: some View {
-        HStack(spacing: 16) {
-            // File info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(transcript.sourceURL.lastPathComponent)
-                    .font(.headline)
-                Text("\(transcript.segments.count) segments • \(transcript.speakerCount) speakers • \(formatDuration(transcript.duration))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+        HStack(spacing: 12) {
+            // Import button
+            Button(action: { openFilePicker() }) {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 16))
+                    .foregroundColor(AppTheme.textSecondary)
             }
+            .buttonStyle(.plain)
+            .help("导入音频/视频文件")
 
             Spacer()
 
-            // Search
-            HStack {
+            // Search field
+            HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-                TextField("Search transcript...", text: $viewModel.searchText)
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.textTertiary)
+                TextField("搜索...", text: $viewModel.searchText)
                     .textFieldStyle(.plain)
-                    .frame(width: 200)
-
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textPrimary)
                 if !viewModel.searchText.isEmpty {
                     Button(action: { viewModel.searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.textTertiary)
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(6)
-            .background(Color(NSColor.controlBackgroundColor))
-            .cornerRadius(6)
-
-            Divider()
-                .frame(height: 20)
-
-            // Export menu
-            Menu {
-                ForEach(ExportFormat.allCases, id: \.self) { format in
-                    Button(action: { viewModel.exportTranscript(format: format) }) {
-                        Label(exportService.formatDisplayName(for: format),
-                              systemImage: iconForFormat(format))
-                    }
-                }
-            } label: {
-                Label("Export", systemImage: "square.and.arrow.up")
-            }
-            .menuStyle(.borderlessButton)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(AppTheme.surface)
+            .cornerRadius(AppTheme.cornerRadiusSmall)
+            .frame(width: 200)
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(Color(NSColor.controlBackgroundColor))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(AppTheme.background)
     }
 
-    private let exportService = ExportService()
+    private func openFilePicker() {
+        let panel = NSOpenPanel()
+        panel.title = "选择音频或视频文件"
+        panel.allowedContentTypes = [
+            .audio, .mp3, .wav, .aiff, .mpeg4Audio,
+            .movie, .mpeg4Movie, .quickTimeMovie
+        ]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
 
-    private func formatDuration(_ duration: TimeInterval) -> String {
-        let hours = Int(duration) / 3600
-        let minutes = (Int(duration) % 3600) / 60
-        let seconds = Int(duration) % 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            return String(format: "%02d:%02d", minutes, seconds)
-        }
-    }
-
-    private func iconForFormat(_ format: ExportFormat) -> String {
-        switch format {
-        case .srt: return "subtitles"
-        case .txt: return "doc.text"
-        case .markdown: return "doc.richtext"
-        case .html: return "globe"
-        case .json: return "doc.badge.gearshape"
+        if panel.runModal() == .OK, let url = panel.url {
+            viewModel.processFile(url: url)
         }
     }
 }
 
-/// Individual segment row
-struct SegmentRow: View {
-    let segment: TranscriptSegment
-    let isSelected: Bool
-    let onToggle: () -> Void
+// MARK: - Speaker Grouped List
 
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Selection checkbox
-            Button(action: onToggle) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? .blue : .secondary)
-            }
-            .buttonStyle(.plain)
+struct SpeakerGroupedListView: View {
+    let segments: [TranscriptSegment]
+    let selectedIDs: Set<UUID>
+    let onToggle: (UUID) -> Void
+    let onSeek: ((TimeInterval) -> Void)?
 
-            // Timestamp
-            Text(segment.displayTimestamp)
-                .font(.caption)
-                .foregroundColor(.blue)
-                .frame(width: 50, alignment: .leading)
+    private var groupedBlocks: [(speaker: String?, segments: [TranscriptSegment])] {
+        var blocks: [(speaker: String?, segments: [TranscriptSegment])] = []
+        var currentSpeaker: String? = nil
+        var currentSegments: [TranscriptSegment] = []
 
-            // Speaker badge
-            if let speaker = segment.speaker {
-                Text(speaker)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(speakerColor(speaker).opacity(0.2))
-                    .foregroundColor(speakerColor(speaker))
-                    .cornerRadius(4)
-            }
-
-            // Emotion indicator
-            if let sentiment = segment.sentiment {
-                Text(sentiment.emotion.emoji)
-                    .font(.caption)
-            }
-
-            // Text content
-            VStack(alignment: .leading, spacing: 4) {
-                Text(segment.text)
-                    .font(.body)
-                    .textSelection(.enabled)
-
-                // Sentiment details (expandable)
-                if let sentiment = segment.sentiment {
-                    SentimentDetailView(sentiment: sentiment)
+        for segment in segments {
+            if segment.speaker != currentSpeaker {
+                if !currentSegments.isEmpty {
+                    blocks.append((speaker: currentSpeaker, segments: currentSegments))
                 }
+                currentSpeaker = segment.speaker
+                currentSegments = [segment]
+            } else {
+                currentSegments.append(segment)
             }
-
-            Spacer()
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
-        .cornerRadius(8)
-        .onHover { hovering in
-            // Visual feedback on hover
+        if !currentSegments.isEmpty {
+            blocks.append((speaker: currentSpeaker, segments: currentSegments))
         }
+        return blocks
     }
-
-    private func speakerColor(_ speaker: String) -> Color {
-        let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .cyan, .indigo]
-        let hash = abs(speaker.hashValue)
-        return colors[hash % colors.count]
-    }
-}
-
-/// Sentiment detail view
-struct SentimentDetailView: View {
-    let sentiment: SentimentResult
-
-    var body: some View {
-        HStack(spacing: 8) {
-            // Score bar
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 4)
-
-                    Rectangle()
-                        .fill(scoreColor)
-                        .frame(width: geometry.size.width * CGFloat(abs(sentiment.score)), height: 4)
-                }
-            }
-            .frame(width: 60, height: 4)
-
-            // Score value
-            Text(String(format: "%.2f", sentiment.score))
-                .font(.caption2)
-                .foregroundColor(.secondary)
-
-            // Confidence
-            Text("\(Int(sentiment.confidence * 100))%")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-    }
-
-    private var scoreColor: Color {
-        if sentiment.score > 0.3 {
-            return .green
-        } else if sentiment.score < -0.3 {
-            return .red
-        } else {
-            return .gray
-        }
-    }
-}
-
-/// Sentiment summary view
-struct SentimentSummaryView: View {
-    let summary: SentimentSummary
-    let transcript: Transcript
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Header
-                Text("Sentiment Analysis")
-                    .font(.headline)
-
-                // Overall score
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Overall Sentiment")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    HStack {
-                        Text(String(format: "%.2f", summary.averageScore))
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(scoreColor)
-
-                        Spacer()
-
-                        Text(summary.dominantEmotion.emoji)
-                            .font(.title)
-                    }
-
-                    // Score bar
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.2))
-                                .frame(height: 8)
-
-                            Rectangle()
-                                .fill(scoreGradient)
-                                .frame(width: geometry.size.width * CGFloat((summary.averageScore + 1) / 2), height: 8)
-                        }
-                    }
-                    .frame(height: 8)
-                }
-                .padding()
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(8)
-
-                // Distribution
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Distribution")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    DistributionBar(
-                        positive: summary.positivePercentage,
-                        neutral: summary.neutralPercentage,
-                        negative: summary.negativePercentage
+            LazyVStack(alignment: .leading, spacing: 16) {
+                ForEach(groupedBlocks.indices, id: \.self) { index in
+                    let block = groupedBlocks[index]
+                    SpeakerBlock(
+                        speaker: block.speaker,
+                        segments: block.segments,
+                        selectedIDs: selectedIDs,
+                        onToggle: onToggle,
+                        onSeek: onSeek
                     )
-
-                    HStack {
-                        Label("Positive", systemImage: "hand.thumbsup.fill")
-                            .foregroundColor(.green)
-                        Spacer()
-                        Text("\(Int(summary.positivePercentage))%")
-                            .font(.caption)
-                    }
-
-                    HStack {
-                        Label("Neutral", systemImage: "minus.circle.fill")
-                            .foregroundColor(.gray)
-                        Spacer()
-                        Text("\(Int(summary.neutralPercentage))%")
-                            .font(.caption)
-                    }
-
-                    HStack {
-                        Label("Negative", systemImage: "hand.thumbsdown.fill")
-                            .foregroundColor(.red)
-                        Spacer()
-                        Text("\(Int(summary.negativePercentage))%")
-                            .font(.caption)
-                    }
-                }
-                .padding()
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(8)
-
-                // Emotion breakdown
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Emotions")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    ForEach(EmotionType.allCases, id: \.self) { emotion in
-                        if let count = summary.emotionDistribution[emotion], count > 0 {
-                            HStack {
-                                Text(emotion.emoji)
-                                Text(emotion.rawValue)
-                                    .font(.caption)
-                                Spacer()
-                                Text("\(count)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                }
-                .padding()
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(8)
-
-                // Speaker breakdown
-                if transcript.speakerCount > 1 {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Speakers")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-
-                        ForEach(transcript.speakers, id: \.self) { speaker in
-                            let speakerSegments = transcript.segments.filter { $0.speaker == speaker }
-                            let speakerCount = speakerSegments.count
-
-                            HStack {
-                                Circle()
-                                    .fill(speakerColor(speaker))
-                                    .frame(width: 8, height: 8)
-                                Text(speaker)
-                                    .font(.caption)
-                                Spacer()
-                                Text("\(speakerCount) segments")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(8)
                 }
             }
-            .padding()
+            .padding(20)
         }
-    }
-
-    private var scoreColor: Color {
-        if summary.averageScore > 0.3 {
-            return .green
-        } else if summary.averageScore < -0.3 {
-            return .red
-        } else {
-            return .gray
-        }
-    }
-
-    private var scoreGradient: LinearGradient {
-        LinearGradient(
-            colors: [.red, .gray, .green],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-    }
-
-    private func speakerColor(_ speaker: String) -> Color {
-        let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .cyan, .indigo]
-        let hash = abs(speaker.hashValue)
-        return colors[hash % colors.count]
     }
 }
 
-/// Distribution bar showing positive/neutral/negative
-struct DistributionBar: View {
-    let positive: Double
-    let neutral: Double
-    let negative: Double
+// MARK: - Speaker Block
+
+struct SpeakerBlock: View {
+    let speaker: String?
+    let segments: [TranscriptSegment]
+    let selectedIDs: Set<UUID>
+    let onToggle: (UUID) -> Void
+    let onSeek: ((TimeInterval) -> Void)?
+
+    private var timeRange: String {
+        guard let first = segments.first, let last = segments.last else { return "" }
+        return "\(first.displayTimestamp) - \(last.displayTimestamp)"
+    }
 
     var body: some View {
-        GeometryReader { geometry in
-            HStack(spacing: 0) {
-                if positive > 0 {
-                    Rectangle()
-                        .fill(Color.green)
-                        .frame(width: geometry.size.width * CGFloat(positive / 100))
+        HStack(alignment: .top, spacing: 12) {
+            SpeakerAvatar(name: speaker ?? "?")
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(speaker ?? "未知")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary)
+                    Text(timeRange)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(AppTheme.textTertiary)
                 }
-                if neutral > 0 {
-                    Rectangle()
-                        .fill(Color.gray)
-                        .frame(width: geometry.size.width * CGFloat(neutral / 100))
-                }
-                if negative > 0 {
-                    Rectangle()
-                        .fill(Color.red)
-                        .frame(width: geometry.size.width * CGFloat(negative / 100))
+                .padding(.bottom, 4)
+
+                ForEach(segments) { segment in
+                    TranscriptLine(
+                        segment: segment,
+                        isSelected: selectedIDs.contains(segment.id),
+                        onToggle: { onToggle(segment.id) },
+                        onSeek: onSeek
+                    )
                 }
             }
         }
-        .frame(height: 8)
-        .cornerRadius(4)
+    }
+}
+
+// MARK: - Speaker Avatar
+
+struct SpeakerAvatar: View {
+    let name: String
+
+    private var initials: String {
+        if name.contains(" ") {
+            let parts = name.split(separator: " ")
+            if let last = parts.last, let num = Int(last) {
+                return "\(num)"
+            }
+            return parts.compactMap { $0.first }.prefix(2).map(String.init).joined()
+        }
+        return String(name.prefix(2))
+    }
+
+    private var avatarColor: Color {
+        let hash = abs(name.hashValue)
+        return AppTheme.speakerColors[hash % AppTheme.speakerColors.count]
+    }
+
+    var body: some View {
+        Text(initials)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(.white)
+            .frame(width: 28, height: 28)
+            .background(avatarColor)
+            .clipShape(Circle())
+    }
+}
+
+// MARK: - Transcript Line
+
+struct TranscriptLine: View, Equatable {
+    let segment: TranscriptSegment
+    let isSelected: Bool
+    let onToggle: () -> Void
+    let onSeek: ((TimeInterval) -> Void)?
+
+    static func == (lhs: TranscriptLine, rhs: TranscriptLine) -> Bool {
+        lhs.segment.id == rhs.segment.id &&
+        lhs.segment.text == rhs.segment.text &&
+        lhs.segment.speaker == rhs.segment.speaker &&
+        lhs.isSelected == rhs.isSelected
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Button(action: onToggle) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 13))
+                    .foregroundColor(isSelected ? AppTheme.accent : AppTheme.textTertiary)
+            }
+            .buttonStyle(.plain)
+
+            Text(segment.displayTimestamp)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(AppTheme.accent)
+                .onTapGesture { onSeek?(segment.startTime) }
+                .help("点击跳转到此时间点")
+
+            Text(segment.text)
+                .font(.system(size: 14))
+                .foregroundColor(AppTheme.textPrimary)
+                .textSelection(.enabled)
+                .lineSpacing(3)
+
+            Spacer()
+        }
+        .padding(.vertical, 3)
+        .padding(.horizontal, 8)
+        .background(isSelected ? AppTheme.accentSubtle : Color.clear)
+        .cornerRadius(AppTheme.cornerRadiusSmall)
     }
 }
 
 #Preview {
+    let vm = TranscriptViewModel()
     TranscriptView(
-        viewModel: TranscriptViewModel(),
+        viewModel: vm,
+        selectionManager: vm.selectionManager,
         transcript: Transcript(
             sourceURL: URL(fileURLWithPath: "/test.mp3"),
             segments: [
-                TranscriptSegment(
-                    startTime: 0,
-                    endTime: 5.0,
-                    text: "Hello world",
-                    speaker: "Speaker 1",
-                    sentiment: SentimentResult(score: 0.5, emotion: .positive, confidence: 0.8)
-                )
+                TranscriptSegment(startTime: 0, endTime: 5.0, text: "你好世界", speaker: "说话人 1"),
+                TranscriptSegment(startTime: 5.0, endTime: 10.0, text: "今天天气不错", speaker: "说话人 1"),
+                TranscriptSegment(startTime: 10.0, endTime: 15.0, text: "是的，阳光很好", speaker: "说话人 2")
             ]
         )
     )
+    .preferredColorScheme(.dark)
 }

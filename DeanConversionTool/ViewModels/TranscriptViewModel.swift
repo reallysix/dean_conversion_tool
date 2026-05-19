@@ -1,6 +1,34 @@
 import Foundation
 import SwiftUI
 import Combine
+import AVFoundation
+import AVKit
+
+/// Separate selection manager to avoid triggering ViewModel re-renders
+@MainActor
+class SelectionManager: ObservableObject {
+    @Published var selectedIDs: Set<UUID> = []
+
+    func toggle(_ id: UUID) {
+        if selectedIDs.contains(id) {
+            selectedIDs.remove(id)
+        } else {
+            selectedIDs.insert(id)
+        }
+    }
+
+    func selectAll(_ ids: [UUID]) {
+        selectedIDs = Set(ids)
+    }
+
+    func deselectAll() {
+        selectedIDs.removeAll()
+    }
+
+    func isSelected(_ id: UUID) -> Bool {
+        selectedIDs.contains(id)
+    }
+}
 
 /// Main ViewModel coordinating the full transcription pipeline
 @MainActor
@@ -11,16 +39,43 @@ class TranscriptViewModel: ObservableObject {
     @Published var loadingMessage = ""
     @Published var progress: Double = 0.0
     @Published var error: String?
-    @Published var selectedSegments: Set<UUID> = []
     @Published var searchText = ""
     @Published var selectedFormat: ExportFormat = .markdown
+
+    // Selection is managed separately to avoid re-renders
+    let selectionManager = SelectionManager()
+
+    // Video player
+    @Published var player: AVPlayer?
+    @Published var isVideoFile = false
+
+    // Batch processing
+    @Published var isBatchMode = false
+    @Published var batchQueue: [URL] = []
+    @Published var batchIndex: Int = 0
+    @Published var batchTotal: Int = 0
+    @Published var batchResults: [BatchResult] = []
+    @Published var batchExportDirectory: URL?
+    @Published var batchExportFormat: ExportFormat = .txt
+    @Published var showBatchSetup = false
+    @Published var showBatchSummary = false
+
+    struct BatchResult {
+        let url: URL
+        let success: Bool
+        let error: String?
+    }
+
+    // Cached filtered segments
+    private var cachedSegments: [TranscriptSegment] = []
+    private var cachedSearchText: String?
+    private var cachedTranscriptID: UUID?
 
     // MARK: - Services
     private let whisperService = WhisperService()
     private let audioService = AudioPreprocessingService()
     private let diarizationService = SpeakerDiarizationService()
     private let exportService = ExportService()
-    private let sentimentService = SentimentAnalysisService()
 
     // MARK: - State
     private var tempWavPath: String?
@@ -29,23 +84,27 @@ class TranscriptViewModel: ObservableObject {
     var filteredSegments: [TranscriptSegment] {
         guard let transcript = transcript else { return [] }
 
+        // Return cached if nothing changed
+        if cachedTranscriptID == transcript.id && cachedSearchText == searchText {
+            return cachedSegments
+        }
+
+        // Recalculate
         if searchText.isEmpty {
-            return transcript.segments
+            cachedSegments = transcript.segments
         } else {
-            return transcript.segments.filter { segment in
+            cachedSegments = transcript.segments.filter { segment in
                 segment.text.localizedCaseInsensitiveContains(searchText) ||
                 (segment.speaker?.localizedCaseInsensitiveContains(searchText) ?? false)
             }
         }
+        cachedTranscriptID = transcript.id
+        cachedSearchText = searchText
+        return cachedSegments
     }
 
     var speakers: [String] {
         return transcript?.speakers ?? []
-    }
-
-    var emotionSummary: SentimentSummary? {
-        guard let transcript = transcript else { return nil }
-        return sentimentService.getSummary(for: transcript)
     }
 
     var isModelLoaded: Bool {
@@ -62,51 +121,12 @@ class TranscriptViewModel: ObservableObject {
 
     // MARK: - Initialization
     init() {
-        // Don't load model in init - load lazily when needed
-    }
-
-    /// Load the whisper model
-    func loadModel() {
-        let modelPath = getModelPath()
-        do {
-            try whisperService.loadModel(modelPath: modelPath)
-            print("Model loaded successfully from: \(modelPath)")
-        } catch {
-            self.error = "Failed to load model: \(error.localizedDescription)"
-        }
-    }
-
-    /// Load model lazily when needed
-    private func ensureModelLoaded() throws {
-        guard !whisperService.isModelLoaded else { return }
-        let modelPath = getModelPath()
-        try whisperService.loadModel(modelPath: modelPath)
-    }
-
-    /// Get the path to the whisper model
-    private func getModelPath() -> String {
-        // Check Application Support first
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let modelDir = appSupport.appendingPathComponent("DeanConversion/models")
-        let modelPath = modelDir.appendingPathComponent("ggml-large-v3.bin").path
-
-        if FileManager.default.fileExists(atPath: modelPath) {
-            return modelPath
-        }
-
-        // Fallback to home directory
-        let homeModelPath = NSHomeDirectory() + "/Library/Application Support/DeanConversion/models/ggml-large-v3.bin"
-        if FileManager.default.fileExists(atPath: homeModelPath) {
-            return homeModelPath
-        }
-
-        // Return default path (will fail if not exists)
-        return modelPath
+        // Model loading happens in WhisperService via whisper-cli subprocess
     }
 
     // MARK: - Main Pipeline
 
-    /// Process an audio/video file through the full pipeline
+    /// Process an audio/video file through the full pipeline (single-file mode)
     func processFile(url: URL) {
         guard !isLoading else { return }
 
@@ -115,39 +135,28 @@ class TranscriptViewModel: ObservableObject {
         transcript = nil
         progress = 0.0
 
+        // Check if it's a video file and set up player
+        let videoExtensions = ["mp4", "mov", "avi", "mkv", "webm", "m4v"]
+        let fileExtension = url.pathExtension.lowercased()
+        isVideoFile = videoExtensions.contains(fileExtension)
+
+        if isVideoFile {
+            let avPlayer = AVPlayer(url: url)
+            avPlayer.preventsDisplaySleepDuringVideoPlayback = true
+            player = avPlayer
+        } else {
+            player = nil
+        }
+
         Task {
             do {
-                // Step 0: Ensure model is loaded
-                try ensureModelLoaded()
+                let finalTranscript = try await processFileInternal(url: url) { message, progress in
+                    self.updateLoading(message, progress: progress)
+                }
 
-                // Step 1: Preprocess audio
-                updateLoading("Preparing audio file...", progress: 0.1)
-                let wavPath = try preprocessAudio(inputPath: url.path)
-                tempWavPath = wavPath
-
-                // Step 2: Transcribe with whisper
-                updateLoading("Transcribing audio...", progress: 0.3)
-                let transcribedSegments = try await transcribeAudio(audioPath: wavPath)
-
-                // Step 3: Speaker diarization
-                updateLoading("Identifying speakers...", progress: 0.7)
-                let diarizedSegments = try await diarizeSpeakers(audioPath: wavPath, segments: transcribedSegments)
-
-                // Step 4: Create transcript
-                updateLoading("Finalizing transcript...", progress: 0.9)
-                let duration = try audioService.getAudioDuration(path: url.path)
-                let finalTranscript = Transcript(
-                    sourceURL: url,
-                    segments: diarizedSegments,
-                    duration: duration
-                )
-
-                // Update UI
                 self.transcript = finalTranscript
                 self.progress = 1.0
-                self.loadingMessage = "Complete!"
-
-                // Clean up
+                self.loadingMessage = "完成！"
                 cleanupTempFiles()
 
             } catch {
@@ -157,6 +166,32 @@ class TranscriptViewModel: ObservableObject {
 
             isLoading = false
         }
+    }
+
+    /// Core pipeline: preprocess → transcribe → diarize → return Transcript
+    private func processFileInternal(url: URL, onProgress: ((String, Double) -> Void)? = nil) async throws -> Transcript {
+        // Step 1: Preprocess audio
+        onProgress?("正在准备音频文件...", 0.1)
+        let wavPath = try preprocessAudio(inputPath: url.path)
+        defer { audioService.cleanupTempFile(wavPath) }
+
+        // Step 2: Transcribe with whisper
+        onProgress?("正在转写音频...", 0.3)
+        let transcribedSegments = try await transcribeAudio(audioPath: wavPath)
+
+        // Step 3: Speaker diarization
+        onProgress?("正在识别说话人...", 0.7)
+        let diarizedSegments = try await diarizeSpeakers(audioPath: wavPath, segments: transcribedSegments)
+
+        // Step 4: Create transcript
+        onProgress?("正在生成文稿...", 0.9)
+        let duration = try audioService.getAudioDuration(path: url.path)
+
+        return Transcript(
+            sourceURL: url,
+            segments: diarizedSegments,
+            duration: duration
+        )
     }
 
     // MARK: - Pipeline Steps
@@ -177,7 +212,7 @@ class TranscriptViewModel: ObservableObject {
     /// Transcribe audio using whisper
     private func transcribeAudio(audioPath: String) async throws -> [TranscriptSegment] {
         return try await withCheckedThrowingContinuation { continuation in
-            whisperService.transcribeWithSentiment(
+            whisperService.transcribe(
                 audioPath: audioPath,
                 language: nil  // Auto-detect language
             ) { [weak self] progress in
@@ -186,8 +221,8 @@ class TranscriptViewModel: ObservableObject {
                 }
             } onComplete: { result in
                 switch result {
-                case .success(let transcript):
-                    continuation.resume(returning: transcript.segments)
+                case .success(let segments):
+                    continuation.resume(returning: segments)
                 case .failure(let error):
                     continuation.resume(throwing: error)
                 }
@@ -232,7 +267,7 @@ class TranscriptViewModel: ObservableObject {
 
         let exportFormat = format ?? selectedFormat
         let panel = NSSavePanel()
-        panel.title = "Export Transcript"
+        panel.title = "导出文稿"
         panel.nameFieldStringValue = "\(transcript.sourceURL.deletingPathExtension().lastPathComponent)_transcript.\(exportService.fileExtension(for: exportFormat))"
         panel.allowedContentTypes = [.text, .json, .html]
 
@@ -247,7 +282,7 @@ class TranscriptViewModel: ObservableObject {
                 )
             } catch {
                 Task { @MainActor in
-                    self?.error = "Export failed: \(error.localizedDescription)"
+                    self?.error = "导出失败：\(error.localizedDescription)"
                 }
             }
         }
@@ -269,8 +304,14 @@ class TranscriptViewModel: ObservableObject {
 
     /// Clear the current transcript
     func clearTranscript() {
+        player?.pause()
+        player = nil
+        isVideoFile = false
         transcript = nil
-        selectedSegments.removeAll()
+        selectionManager.deselectAll()
+        cachedSegments = []
+        cachedTranscriptID = nil
+        cachedSearchText = nil
         error = nil
         progress = 0.0
     }
@@ -279,7 +320,7 @@ class TranscriptViewModel: ObservableObject {
     func copySelectedSegments() {
         guard let transcript = transcript else { return }
 
-        let selected = transcript.segments.filter { selectedSegments.contains($0.id) }
+        let selected = transcript.segments.filter { selectionManager.isSelected($0.id) }
         let text = selected.map { $0.text }.joined(separator: "\n")
 
         NSPasteboard.general.clearContents()
@@ -289,11 +330,80 @@ class TranscriptViewModel: ObservableObject {
     /// Select all segments
     func selectAllSegments() {
         guard let transcript = transcript else { return }
-        selectedSegments = Set(transcript.segments.map { $0.id })
+        selectionManager.selectAll(transcript.segments.map { $0.id })
     }
 
     /// Deselect all segments
     func deselectAllSegments() {
-        selectedSegments.removeAll()
+        selectionManager.deselectAll()
+    }
+
+    /// Seek video to a specific time
+    func seekTo(time: TimeInterval) {
+        guard let player = player else { return }
+        let cmTime = CMTime(seconds: time, preferredTimescale: 600)
+        player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    // MARK: - Batch Processing
+
+    /// Start batch processing queued files
+    func startBatch() {
+        guard !isBatchMode, !batchQueue.isEmpty, batchExportDirectory != nil else { return }
+
+        isBatchMode = true
+        isLoading = true
+        batchResults = []
+        batchTotal = batchQueue.count
+        batchIndex = 0
+        error = nil
+        transcript = nil
+        player = nil
+        isVideoFile = false
+
+        Task {
+            for (index, url) in batchQueue.enumerated() {
+                guard isBatchMode else { break }  // cancelled
+
+                batchIndex = index + 1
+                updateLoading("批量处理 \(index + 1)/\(batchQueue.count): \(url.lastPathComponent)", progress: 0)
+
+                do {
+                    let finalTranscript = try await processFileInternal(url: url) { [weak self] message, progress in
+                        guard let self = self else { return }
+                        let overallProgress = Double(index) / Double(self.batchQueue.count) + progress / Double(self.batchQueue.count)
+                        self.updateLoading("批量 \(index + 1)/\(self.batchQueue.count): \(message)", progress: overallProgress)
+                    }
+
+                    // Auto-export
+                    let filename = url.deletingPathExtension().lastPathComponent + "_transcript"
+                    let ext = exportService.fileExtension(for: batchExportFormat)
+                    let outputPath = batchExportDirectory!.appendingPathComponent("\(filename).\(ext)").path
+                    try exportService.export(transcript: finalTranscript, format: batchExportFormat, outputPath: outputPath)
+
+                    batchResults.append(BatchResult(url: url, success: true, error: nil))
+
+                } catch {
+                    batchResults.append(BatchResult(url: url, success: false, error: error.localizedDescription))
+                }
+            }
+
+            let succeeded = batchResults.filter { $0.success }.count
+            let failed = batchResults.filter { !$0.success }.count
+            loadingMessage = "批量完成：\(succeeded) 成功，\(failed) 失败"
+            progress = 1.0
+
+            isBatchMode = false
+            isLoading = false
+            showBatchSummary = true
+        }
+    }
+
+    /// Cancel batch processing
+    func cancelBatch() {
+        isBatchMode = false
+        isLoading = false
+        loadingMessage = "已取消"
+        progress = 0.0
     }
 }

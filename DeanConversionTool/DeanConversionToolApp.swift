@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Main application entry point
 @main
@@ -10,7 +11,7 @@ struct DeanConversionToolApp: App {
         .commands {
             // Add custom menu commands
             CommandGroup(after: .newItem) {
-                Button("Import Audio/Video...") {
+                Button("导入音频/视频...") {
                     // Open file dialog will be handled by the view
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])

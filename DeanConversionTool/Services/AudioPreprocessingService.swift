@@ -194,15 +194,15 @@ enum AudioPreprocessingError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .ffmpegNotFound:
-            return "FFmpeg not found. Please install ffmpeg: brew install ffmpeg"
+            return "FFmpeg 未找到。请安装 ffmpeg：brew install ffmpeg"
         case .inputFileNotFound(let path):
-            return "Input file not found: \(path)"
+            return "输入文件未找到：\(path)"
         case .conversionFailed(let details):
-            return "Audio conversion failed: \(details)"
+            return "音频转换失败：\(details)"
         case .outputFileNotCreated:
-            return "Output file was not created"
+            return "输出文件未创建"
         case .processFailed(let error):
-            return "Process failed: \(error.localizedDescription)"
+            return "进程执行失败：\(error.localizedDescription)"
         }
     }
 }

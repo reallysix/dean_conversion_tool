@@ -55,8 +55,6 @@ open DeanConversionTool.xcodeproj
 - **Best accuracy**: Use the large-v3 model (default)
 - **Faster processing**: Change to "medium" or "small" in Settings
 - **Speaker detection**: Ensure audio has clear speaker separation
-- **Emotion analysis**: Works best with longer sentences
-
 ## Troubleshooting
 
 **App won't build?**
@@ -82,7 +80,6 @@ open DeanConversionTool.xcodeproj
 
 After testing, you can:
 - Customize the UI in `Views/ContentView.swift`
-- Adjust sentiment thresholds in `Services/SentimentAnalysisService.swift`
 - Add new export formats in `Services/ExportService.swift`
 - Configure settings in `Views/SettingsView.swift`
 

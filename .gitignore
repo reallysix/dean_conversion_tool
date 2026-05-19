@@ -38,6 +38,9 @@ Carthage/Checkouts/
 # AppCode
 .idea/
 
+# Local agent settings
+.claude/settings.local.json
+
 # macOS
 .DS_Store
 .AppleDouble

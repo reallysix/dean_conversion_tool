@@ -8,7 +8,6 @@ Audio/Video to Transcript Converter for macOS
 
 - **Whisper Transcription**: Local AI-powered transcription using whisper.cpp with Metal GPU acceleration
 - **Speaker Diarization**: Identify and distinguish different speakers using pyannote.audio
-- **Emotion Analysis**: Detect sentiment and emotion in speech using Apple's NaturalLanguage framework
 - **Multiple Export Formats**: SRT, TXT, Markdown, HTML, JSON
 - **Drag & Drop**: Import audio/video files by dragging them into the app
 - **Beautiful UI**: Native SwiftUI interface with real-time progress updates
@@ -66,11 +65,9 @@ Then build and run from Xcode (⌘R).
    - Audio preprocessing (converting to WAV format)
    - Whisper transcription
    - Speaker diarization (if enabled)
-   - Sentiment analysis
 4. **View results**:
    - Browse transcript segments
    - See speaker labels and timestamps
-   - View emotion indicators
 5. **Export**:
    - Click the Export button
    - Choose your preferred format (SRT, TXT, Markdown, HTML, JSON)
@@ -84,7 +81,7 @@ Then build and run from Xcode (⌘R).
 ### Output Formats
 - **SRT**: SubRip subtitle format for video editing
 - **TXT**: Plain text with speaker labels
-- **Markdown**: Rich text with formatting, timestamps, and emotion analysis
+- **Markdown**: Rich text with formatting, timestamps, and speaker labels
 - **HTML**: Beautiful web page with styling and interactive elements
 - **JSON**: Structured data for programmatic access
 
@@ -96,7 +93,6 @@ DeanConversionTool/
 │   └── TranscriptSegment.swift      # Data models
 ├── Services/
 │   ├── WhisperService.swift         # whisper.cpp integration
-│   ├── SentimentAnalysisService.swift  # Apple NaturalLanguage
 │   ├── SpeakerDiarizationService.swift # pyannote.audio bridge
 │   ├── AudioPreprocessingService.swift # FFmpeg wrapper
 │   └── ExportService.swift          # Multi-format export
@@ -145,4 +141,3 @@ Copyright © 2026 Dean. All rights reserved.
 - [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - C++ implementation of Whisper
 - [pyannote.audio](https://github.com/pyannote/pyannote-audio) - Speaker diarization toolkit
 - [FFmpeg](https://ffmpeg.org/) - Audio/video processing
-- [Apple NaturalLanguage](https://developer.apple.com/documentation/naturallanguage) - Sentiment analysis

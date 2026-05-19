@@ -3,14 +3,14 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>zh-Hans</string>
 	<key>CFBundleDisplayName</key>
-	<string>Dean Conversion Tool</string>
+	<string>语音转文字工具</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>Audio File</string>
+			<string>音频文件</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>LSHandlerRank</key>
@@ -27,7 +27,7 @@
 		</dict>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>Video File</string>
+			<string>视频文件</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>LSHandlerRank</key>
@@ -48,7 +48,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>DeanConversionTool</string>
+	<string>语音转文字工具</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -60,10 +60,10 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2026 Dean. All rights reserved.</string>
+	<string>Copyright © 2026 Dean. 保留所有权利。</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Dean Conversion Tool needs microphone access for audio transcription.</string>
+	<string>语音转文字工具需要麦克风权限以进行音频转录。</string>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>Dean Conversion Tool needs screen recording access for video transcription.</string>
+	<string>语音转文字工具需要屏幕录制权限以进行视频转录。</string>
 </dict>
 </plist>
