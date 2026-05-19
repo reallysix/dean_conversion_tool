@@ -61,7 +61,7 @@ targets:
               - com.apple.quicktime-movie
               - public.mpeg-4
               - org.matroska.mkv
-        CFBundleExecutable: DeanConversionTool
+        CFBundleExecutable: "$(EXECUTABLE_NAME)"
         CFBundleIdentifier: com.dean.conversiontool
         CFBundleInfoDictionaryVersion: "6.0"
         CFBundleName: 语音转文字工具

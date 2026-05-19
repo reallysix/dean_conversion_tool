@@ -42,7 +42,7 @@
 		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
-	<string>DeanConversionTool</string>
+	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.dean.conversiontool</string>
 	<key>CFBundleInfoDictionaryVersion</key>
