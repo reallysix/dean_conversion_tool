@@ -2,135 +2,177 @@
 
 [English Documentation](README_EN.md)
 
-Audio/Video to Transcript Converter for macOS
+Dean Conversion Tool 是一款 macOS 原生音视频转文字工具。它基于 `whisper.cpp` 在本地完成转写，支持可选的说话人识别，并可以将逐字稿导出为 SRT、TXT、Markdown、HTML 和 JSON。
 
-## Features
+## 功能亮点
 
-- **Whisper Transcription**: Local AI-powered transcription using whisper.cpp with Metal GPU acceleration
-- **Speaker Diarization**: Identify and distinguish different speakers using pyannote.audio
-- **Multiple Export Formats**: SRT, TXT, Markdown, HTML, JSON
-- **Drag & Drop**: Import audio/video files by dragging them into the app
-- **Beautiful UI**: Native SwiftUI interface with real-time progress updates
+- 本地转写：通过 `whisper-cli` 调用 whisper.cpp，无需把音频上传到云端。
+- 音视频导入：支持拖拽导入常见音频和视频文件。
+- 说话人识别：可通过 `pyannote.audio` 为转写片段匹配说话人标签。
+- 批量处理：支持多文件批量转写并自动导出。
+- 视频预览：视频文件可在应用内播放，并按时间戳跳转。
+- 多格式导出：支持 SRT、TXT、Markdown、HTML、JSON。
+- 原生界面：SwiftUI 构建，适配 macOS 桌面工作流。
 
-## System Requirements
+## 运行要求
 
-- macOS 14.0 (Sonoma) or later
-- Apple Silicon Mac (M1/M2/M3) recommended for optimal performance
-- 16GB RAM recommended (for large-v3 model)
-- Python 3.13+ (for speaker diarization)
+- macOS 14.0 Sonoma 或更高版本
+- Xcode 15 或更高版本
+- Apple Silicon Mac 推荐
+- Homebrew
+- Python 3.13+，仅说话人识别需要
+- 16GB RAM 推荐，尤其使用 large-v3 模型时
 
-## Installation
-
-### 1. Install Dependencies
+## 依赖安装
 
 ```bash
-# Install whisper.cpp
 brew install whisper-cpp
-
-# Install Python dependencies for speaker diarization
-pip3 install --break-system-packages pyannote.audio torch torchaudio
-
-# Install xcodegen (for project generation)
+brew install ffmpeg
 brew install xcodegen
+pip3 install --break-system-packages pyannote.audio torch torchaudio
 ```
 
-### 2. Download Whisper Model
+说话人识别依赖 Hugging Face 模型授权。首次使用前可能需要登录 Hugging Face 并接受 pyannote 模型许可。
+
+## 下载 Whisper 模型
 
 ```bash
-# Run the model download script
 ./download_model.sh
 ```
 
-This will download the large-v3 model (~3.1GB) to `~/Library/Application Support/DeanConversion/models/`
+脚本会将 large-v3 模型下载到：
 
-### 3. Build the App
+```text
+~/Library/Application Support/DeanConversion/models/
+```
+
+## 构建与启动
 
 ```bash
-# Generate Xcode project
 xcodegen generate
+xcodebuild -project DeanConversionTool.xcodeproj -scheme DeanConversionTool -configuration Debug build
+open ~/Library/Developer/Xcode/DerivedData/DeanConversionTool-*/Build/Products/Debug/"Dean Conversion Tool.app"
+```
 
-# Open in Xcode
+也可以生成项目后直接用 Xcode 打开：
+
+```bash
 open DeanConversionTool.xcodeproj
 ```
 
-Then build and run from Xcode (⌘R).
+然后选择 `DeanConversionTool` scheme，按 `Cmd + R` 运行。
 
-## Usage
+## 使用流程
 
-1. **Launch the app**
-2. **Import audio/video file**: 
-   - Click "Import Audio/Video" in the sidebar
-   - Or drag & drop a file onto the app window
-3. **Wait for processing**:
-   - Audio preprocessing (converting to WAV format)
-   - Whisper transcription
-   - Speaker diarization (if enabled)
-4. **View results**:
-   - Browse transcript segments
-   - See speaker labels and timestamps
-5. **Export**:
-   - Click the Export button
-   - Choose your preferred format (SRT, TXT, Markdown, HTML, JSON)
+1. 启动应用。
+2. 点击导入按钮，或将音频/视频文件拖入窗口。
+3. 等待处理流程完成：
+   - 音频预处理
+   - Whisper 转写
+   - 说话人识别，可选
+4. 浏览逐字稿、搜索内容、选择片段或跳转视频时间点。
+5. 导出为需要的格式。
 
-## Supported Formats
+## 支持格式
 
-### Input Formats
-- **Audio**: MP3, WAV, M4A, AAC, FLAC, OGG, WMA
-- **Video**: MP4, MOV, AVI, MKV, WebM, M4V
+输入格式：
 
-### Output Formats
-- **SRT**: SubRip subtitle format for video editing
-- **TXT**: Plain text with speaker labels
-- **Markdown**: Rich text with formatting, timestamps, and speaker labels
-- **HTML**: Beautiful web page with styling and interactive elements
-- **JSON**: Structured data for programmatic access
+- 音频：MP3、WAV、M4A、AAC、FLAC、OGG、WMA
+- 视频：MP4、MOV、AVI、MKV、WebM、M4V
 
-## Architecture
+导出格式：
 
-```
+- SRT：字幕剪辑工作流
+- TXT：纯文本逐字稿
+- Markdown：带时间戳和说话人标签的文档
+- HTML：可浏览的网页版本
+- JSON：结构化数据
+
+## 项目结构
+
+```text
 DeanConversionTool/
 ├── Models/
-│   └── TranscriptSegment.swift      # Data models
+│   └── TranscriptSegment.swift
 ├── Services/
-│   ├── WhisperService.swift         # whisper.cpp integration
-│   ├── SpeakerDiarizationService.swift # pyannote.audio bridge
-│   ├── AudioPreprocessingService.swift # FFmpeg wrapper
-│   └── ExportService.swift          # Multi-format export
+│   ├── AudioPreprocessingService.swift
+│   ├── ExportService.swift
+│   ├── SpeakerDiarizationService.swift
+│   └── WhisperService.swift
 ├── ViewModels/
-│   └── TranscriptViewModel.swift    # Main app logic
+│   └── TranscriptViewModel.swift
 ├── Views/
-│   ├── ContentView.swift            # Main layout
-│   ├── TranscriptView.swift         # Transcript display
-│   └── SettingsView.swift           # App settings
-├── Resources/                       # App resources
-└── Bridging-Header.h                # whisper.cpp C API bridge
+│   ├── BatchSetupSheet.swift
+│   ├── BottomBar.swift
+│   ├── ContentView.swift
+│   ├── NavSidebar.swift
+│   ├── PropertiesPanel.swift
+│   ├── SettingsView.swift
+│   ├── Theme.swift
+│   ├── TranscriptView.swift
+│   └── VideoPlayerView.swift
+└── DeanConversionToolApp.swift
+
+PythonHelpers/
+└── speaker_diarization.py
 ```
 
-## Performance
+## 验证
 
-- **Whisper large-v3**: ~1-2x realtime on M2 Pro with Metal acceleration
-- **Speaker diarization**: Adds ~10-20% processing time
-- **Memory usage**: ~6-8GB during transcription (with large-v3 model)
-- **Disk space**: ~3.1GB for whisper model
+```bash
+xcodegen generate
+xcodebuild -project DeanConversionTool.xcodeproj -scheme DeanConversionTool -configuration Debug build
+```
 
-## Troubleshooting
+集成测试脚本：
 
-### "Model not found" error
-Run `./download_model.sh` to download the whisper model.
+```bash
+./test_pipeline.sh
+```
 
-### "Python not found" error
-Ensure Python 3 is installed and pyannote.audio is available:
+`test_pipeline.sh` 会检查 whisper.cpp、FFmpeg、模型文件和 Python 说话人识别依赖。
+
+## 常见问题
+
+### 找不到 Whisper 模型
+
+运行：
+
+```bash
+./download_model.sh
+```
+
+### 找不到 whisper-cli
+
+确认已安装：
+
+```bash
+brew install whisper-cpp
+which whisper-cli
+```
+
+### 找不到 FFmpeg
+
+确认已安装：
+
+```bash
+brew install ffmpeg
+which ffmpeg
+```
+
+### 说话人识别不可用
+
+确认 Python 依赖可导入：
+
 ```bash
 python3 -c "import pyannote.audio; print('OK')"
 ```
 
-### Slow transcription
-- Ensure you're on Apple Silicon (M1/M2/M3)
-- Check that Metal GPU acceleration is enabled (logged on first run)
-- Consider using a smaller model (medium or small) for faster processing
+同时确认 Hugging Face token 和 pyannote 模型授权已配置。
 
-### Memory warnings
-The large-v3 model requires ~6-8GB RAM. Close other memory-intensive apps if needed.
+## 当前范围
+
+当前版本聚焦转写、说话人识别、批量处理和导出。情感分析功能已从项目范围中移除。
 
 ## License
 
@@ -138,6 +180,6 @@ Copyright © 2026 Dean. All rights reserved.
 
 ## Acknowledgments
 
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - C++ implementation of Whisper
-- [pyannote.audio](https://github.com/pyannote/pyannote-audio) - Speaker diarization toolkit
-- [FFmpeg](https://ffmpeg.org/) - Audio/video processing
+- [whisper.cpp](https://github.com/ggerganov/whisper.cpp)
+- [pyannote.audio](https://github.com/pyannote/pyannote-audio)
+- [FFmpeg](https://ffmpeg.org/)
