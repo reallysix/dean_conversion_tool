@@ -10,6 +10,8 @@ Dean Conversion Tool 是一款 macOS 原生音视频转文字工具。它基于 
 - 音视频导入：支持拖拽导入常见音频和视频文件。
 - 说话人识别：可通过 `pyannote.audio` 为转写片段匹配说话人标签。
 - 批量处理：支持多文件批量转写并自动导出。
+- 在线视频：支持粘贴 `yt-dlp` 可解析的公开视频链接，并将原始链接保存到历史项目。
+- 历史记录：按视频标题归档转写结果、字幕和文本文件，不复制原始音视频。
 - 视频预览：视频文件可在应用内播放，并按时间戳跳转。
 - 多格式导出：支持 SRT、TXT、Markdown、HTML、JSON。
 - 原生界面：SwiftUI 构建，适配 macOS 桌面工作流。
@@ -28,9 +30,24 @@ Dean Conversion Tool 是一款 macOS 原生音视频转文字工具。它基于 
 ```bash
 brew install whisper-cpp
 brew install ffmpeg
+brew install yt-dlp
 brew install xcodegen
 pip3 install --break-system-packages pyannote.audio torch torchaudio
 ```
+
+也可以使用项目脚本检查必需命令行工具：
+
+```bash
+Scripts/check_dependencies.sh
+```
+
+如果需要自动通过 Homebrew 安装缺失工具：
+
+```bash
+Scripts/check_dependencies.sh --install
+```
+
+后续打包安装包时，应在安装阶段调用同一套检查逻辑，确保用户首次启动前已经具备 `whisper-cli`、FFmpeg 和 `yt-dlp`。
 
 说话人识别依赖 Hugging Face 模型授权。首次使用前可能需要登录 Hugging Face 并接受 pyannote 模型许可。
 
@@ -65,13 +82,22 @@ open DeanConversionTool.xcodeproj
 ## 使用流程
 
 1. 启动应用。
-2. 点击导入按钮，或将音频/视频文件拖入窗口。
+2. 点击导入按钮，或将音频/视频文件拖入窗口；也可以点击“粘贴在线视频”输入公开的视频链接。
 3. 等待处理流程完成：
+   - 在线视频音频下载
    - 音频预处理
    - Whisper 转写
    - 说话人识别，可选
 4. 浏览逐字稿、搜索内容、选择片段或跳转视频时间点。
 5. 导出为需要的格式。
+
+历史项目默认保存在：
+
+```text
+~/Documents/DeanConversionTool/Projects
+```
+
+应用会自动创建目录。历史记录只保存源路径或源链接，以及生成的转写、字幕和文本结果。
 
 ## 支持格式
 
@@ -79,6 +105,7 @@ open DeanConversionTool.xcodeproj
 
 - 音频：MP3、WAV、M4A、AAC、FLAC、OGG、WMA
 - 视频：MP4、MOV、AVI、MKV、WebM、M4V
+- 在线视频：`yt-dlp` 支持解析的公开视频链接，例如 YouTube、B 站、抖音等公开链接
 
 导出格式：
 
@@ -158,6 +185,15 @@ which whisper-cli
 ```bash
 brew install ffmpeg
 which ffmpeg
+```
+
+### 找不到 yt-dlp
+
+确认已安装：
+
+```bash
+brew install yt-dlp
+which yt-dlp
 ```
 
 ### 说话人识别不可用

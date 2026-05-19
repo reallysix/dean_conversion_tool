@@ -16,6 +16,7 @@ TEST_AUDIO="$HOME/Desktop/test_audio.wav"
 OUTPUT_DIR="$HOME/Desktop/test_output"
 WHISPER_CLI="/opt/homebrew/bin/whisper-cli"
 FFMPEG="/opt/homebrew/bin/ffmpeg"
+YTDLP="$(command -v yt-dlp || true)"
 
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
@@ -45,6 +46,14 @@ if [ -f "$FFMPEG" ]; then
     echo "✓ FFmpeg found: $FFMPEG"
 else
     echo "✗ FFmpeg not found"
+    exit 1
+fi
+
+# Check yt-dlp
+if [ -n "$YTDLP" ]; then
+    echo "✓ yt-dlp found: $YTDLP"
+else
+    echo "✗ yt-dlp not found"
     exit 1
 fi
 
@@ -154,6 +163,7 @@ echo "Environment:"
 echo "  - Whisper CLI: $(which whisper-cli)"
 echo "  - Model: $WHISPER_MODEL"
 echo "  - FFmpeg: $(which ffmpeg)"
+echo "  - yt-dlp: $(which yt-dlp)"
 echo "  - Python: $(which python3)"
 
 echo ""

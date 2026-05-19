@@ -34,8 +34,15 @@ For pipeline-level checks, use:
 The pipeline test depends on local tools and models:
 - `/opt/homebrew/bin/whisper-cli`
 - `/opt/homebrew/bin/ffmpeg`
+- `yt-dlp` on `PATH` or in common Homebrew locations
 - `~/Library/Application Support/DeanConversion/models/ggml-large-v3.bin`
 - Python 3 with `pyannote.audio` for speaker diarization checks
+
+Use this command before packaging or release checks:
+
+```bash
+Scripts/check_dependencies.sh
+```
 
 ## Development Rules
 
@@ -67,7 +74,8 @@ Confirmed product decisions:
 
 Current known follow-up areas:
 - Stabilize the existing UI refresh and batch-processing work.
-- Add online video URL transcription after the history/workspace foundation is stable.
+- Make the online video URL flow more polished than the current basic prompt.
+- Add installer/package integration that invokes `Scripts/check_dependencies.sh --install` or an equivalent dependency step before first app launch.
 - Replace waveform placeholders with real waveform data if requested.
 - Add transcript editing only if explicitly requested.
 - Keep speaker diarization optional and resilient when Python dependencies or HuggingFace access are missing.
