@@ -12,6 +12,7 @@ Core stack:
 - `whisper-cli` from `whisper-cpp` for local transcription
 - FFmpeg for audio/video preprocessing
 - Optional Python helper for speaker diarization via `pyannote.audio`
+- `yt-dlp` is accepted for the first version of online video transcription.
 
 Emotion/sentiment analysis has been removed from the product scope. Do not add new sentiment analysis UI, services, export fields, or documentation unless explicitly requested.
 
@@ -57,8 +58,16 @@ Important files:
 
 ## Product Scope Notes
 
+Confirmed product decisions:
+- History projects are stored under `~/Documents/DeanConversionTool/Projects` and the app should create that directory automatically.
+- History projects should save source metadata and generated transcript/subtitle files, not copied audio or full video files.
+- For online videos, save the original video link. For local imports, save the original local file path.
+- First online-video version should support public videos through `yt-dlp`; no account login or cookies workflow until requested.
+- UI direction is a light, clean workstation layout inspired by the provided reference image: left navigation/history, central workspace, right details/actions.
+
 Current known follow-up areas:
 - Stabilize the existing UI refresh and batch-processing work.
+- Add online video URL transcription after the history/workspace foundation is stable.
 - Replace waveform placeholders with real waveform data if requested.
 - Add transcript editing only if explicitly requested.
 - Keep speaker diarization optional and resilient when Python dependencies or HuggingFace access are missing.

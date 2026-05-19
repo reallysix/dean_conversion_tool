@@ -27,6 +27,7 @@ struct AppTheme {
     static let textSecondary     = Color(hex: 0x6B6B6B)
     static let textTertiary      = Color(hex: 0x9B9B9B)
     static let accent            = Color(hex: 0x007AFF)
+    static let accentWarm        = Color(hex: 0xFFD23F)
     static let accentSubtle      = Color(hex: 0x007AFF).opacity(0.08)
     static let danger            = Color(hex: 0xE53E3E)
 
@@ -44,6 +45,7 @@ struct AppTheme {
     static let cornerRadiusSmall: CGFloat = 6
     static let cornerRadiusMedium: CGFloat = 10
     static let navRailWidth: CGFloat = 56
+    static let historySidebarWidth: CGFloat = 260
     static let propertiesPanelWidth: CGFloat = 260
     static let bottomBarHeight: CGFloat = 72
 }

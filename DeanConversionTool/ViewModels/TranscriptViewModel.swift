@@ -41,6 +41,8 @@ class TranscriptViewModel: ObservableObject {
     @Published var error: String?
     @Published var searchText = ""
     @Published var selectedFormat: ExportFormat = .markdown
+    @Published var historyProjects: [HistoryProject] = []
+    @Published var selectedProjectID: UUID?
 
     // Selection is managed separately to avoid re-renders
     let selectionManager = SelectionManager()
@@ -76,6 +78,7 @@ class TranscriptViewModel: ObservableObject {
     private let audioService = AudioPreprocessingService()
     private let diarizationService = SpeakerDiarizationService()
     private let exportService = ExportService()
+    private let historyStore = HistoryProjectStore()
 
     // MARK: - State
     private var tempWavPath: String?
@@ -122,6 +125,7 @@ class TranscriptViewModel: ObservableObject {
     // MARK: - Initialization
     init() {
         // Model loading happens in WhisperService via whisper-cli subprocess
+        loadHistoryProjects()
     }
 
     // MARK: - Main Pipeline
@@ -155,6 +159,7 @@ class TranscriptViewModel: ObservableObject {
                 }
 
                 self.transcript = finalTranscript
+                self.archiveTranscript(finalTranscript)
                 self.progress = 1.0
                 self.loadingMessage = "完成！"
                 cleanupTempFiles()
@@ -288,6 +293,48 @@ class TranscriptViewModel: ObservableObject {
         }
     }
 
+    // MARK: - History
+
+    func loadHistoryProjects() {
+        do {
+            try historyStore.ensureProjectsDirectory()
+            historyProjects = try historyStore.loadProjects()
+        } catch {
+            self.error = "历史目录初始化失败：\(error.localizedDescription)"
+        }
+    }
+
+    func openProject(_ project: HistoryProject) {
+        do {
+            let archivedTranscript = try historyStore.loadTranscript(for: project)
+            transcript = archivedTranscript
+            selectedProjectID = project.id
+            error = nil
+            searchText = ""
+            selectionManager.deselectAll()
+            cachedSegments = []
+            cachedTranscriptID = nil
+            cachedSearchText = nil
+
+            let videoExtensions = ["mp4", "mov", "avi", "mkv", "webm", "m4v"]
+            let sourceURL = archivedTranscript.sourceURL
+            isVideoFile = videoExtensions.contains(sourceURL.pathExtension.lowercased())
+            player = isVideoFile ? AVPlayer(url: sourceURL) : nil
+        } catch {
+            self.error = "打开历史项目失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func archiveTranscript(_ transcript: Transcript) {
+        do {
+            let project = try historyStore.saveTranscriptProject(transcript: transcript)
+            selectedProjectID = project.id
+            historyProjects = try historyStore.loadProjects()
+        } catch {
+            self.error = "历史归档失败：\(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Utility Functions
 
     private func updateLoading(_ message: String, progress: Double) {
@@ -308,6 +355,7 @@ class TranscriptViewModel: ObservableObject {
         player = nil
         isVideoFile = false
         transcript = nil
+        selectedProjectID = nil
         selectionManager.deselectAll()
         cachedSegments = []
         cachedTranscriptID = nil
@@ -380,6 +428,7 @@ class TranscriptViewModel: ObservableObject {
                     let ext = exportService.fileExtension(for: batchExportFormat)
                     let outputPath = batchExportDirectory!.appendingPathComponent("\(filename).\(ext)").path
                     try exportService.export(transcript: finalTranscript, format: batchExportFormat, outputPath: outputPath)
+                    archiveTranscript(finalTranscript)
 
                     batchResults.append(BatchResult(url: url, success: true, error: nil))
 

@@ -9,8 +9,8 @@ struct ContentView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Left nav rail
-            NavSidebar(viewModel: viewModel, selectedPanel: $selectedPanel)
+            // Left workspace rail
+            WorkspaceSidebar(viewModel: viewModel, selectedPanel: $selectedPanel)
 
             Rectangle()
                 .fill(AppTheme.border)
@@ -49,7 +49,7 @@ struct ContentView: View {
                     .frame(height: AppTheme.bottomBarHeight)
             }
         }
-        .frame(minWidth: 960, minHeight: 600)
+        .frame(minWidth: 1100, minHeight: 680)
         .background(AppTheme.background)
         .onDrop(of: [.fileURL], isTargeted: $isDragOver) { providers in
             handleDrop(providers: providers)
@@ -112,6 +112,7 @@ struct TranscriptContainerView: View {
                 Rectangle().fill(AppTheme.border).frame(height: 1)
             }
 
+            WorkspaceHeader(viewModel: viewModel)
             TranscriptToolbar(viewModel: viewModel)
 
             if let transcript = viewModel.transcript {
@@ -120,6 +121,64 @@ struct TranscriptContainerView: View {
                 WelcomeView(viewModel: viewModel)
             }
         }
+    }
+}
+
+struct WorkspaceHeader: View {
+    @ObservedObject var viewModel: TranscriptViewModel
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(viewModel.transcript?.sourceURL.deletingPathExtension().lastPathComponent ?? "转写工作台")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+                    .lineLimit(1)
+
+                Text(subtitle)
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textTertiary)
+            }
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                HeaderMetric(title: "历史", value: "\(viewModel.historyProjects.count)")
+                HeaderMetric(title: "片段", value: "\(viewModel.transcript?.segments.count ?? 0)")
+                HeaderMetric(title: "说话人", value: "\(viewModel.transcript?.speakerCount ?? 0)")
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 24)
+        .padding(.bottom, 18)
+        .background(AppTheme.background)
+    }
+
+    private var subtitle: String {
+        if viewModel.isLoading {
+            return viewModel.loadingMessage
+        }
+        if let transcript = viewModel.transcript {
+            return "来源：\(transcript.sourceURL.path)"
+        }
+        return "导入本地文件开始转写，历史项目会自动保存到文档目录"
+    }
+}
+
+struct HeaderMetric: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary)
+            Text(title)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(AppTheme.textTertiary)
+        }
+        .frame(width: 70, alignment: .leading)
     }
 }
 
