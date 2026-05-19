@@ -130,7 +130,7 @@ struct WorkspaceHeader: View {
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(viewModel.transcript?.sourceURL.deletingPathExtension().lastPathComponent ?? "转写工作台")
+                Text(viewModel.transcript?.displayTitle ?? "转写工作台")
                     .font(.system(size: 30, weight: .semibold))
                     .foregroundColor(AppTheme.textPrimary)
                     .lineLimit(1)
@@ -159,7 +159,7 @@ struct WorkspaceHeader: View {
             return viewModel.loadingMessage
         }
         if let transcript = viewModel.transcript {
-            return "来源：\(transcript.sourceURL.path)"
+            return "来源：\(transcript.displaySource)"
         }
         return "导入本地文件开始转写，历史项目会自动保存到文档目录"
     }

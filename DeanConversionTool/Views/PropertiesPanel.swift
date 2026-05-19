@@ -18,7 +18,8 @@ struct PropertiesPanel: View {
                 if let transcript = viewModel.transcript {
                     // File info
                     PropertiesSection(title: "文件") {
-                        PropertyRow(label: "名称", value: transcript.sourceURL.lastPathComponent)
+                        PropertyRow(label: "名称", value: transcript.displayTitle)
+                        PropertyRow(label: "来源", value: transcript.sourceURL.isFileURL ? "本地文件" : "在线视频")
                         PropertyRow(label: "时长", value: formatDuration(transcript.duration))
                         PropertyRow(label: "片段", value: "\(transcript.segments.count)")
                         PropertyRow(label: "语言", value: transcript.language ?? "自动")

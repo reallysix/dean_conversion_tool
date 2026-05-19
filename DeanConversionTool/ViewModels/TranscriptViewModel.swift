@@ -79,6 +79,7 @@ class TranscriptViewModel: ObservableObject {
     private let diarizationService = SpeakerDiarizationService()
     private let exportService = ExportService()
     private let historyStore = HistoryProjectStore()
+    private let onlineVideoService = OnlineVideoService()
 
     // MARK: - State
     private var tempWavPath: String?
@@ -122,6 +123,10 @@ class TranscriptViewModel: ObservableObject {
         return audioService.isFFmpegAvailable
     }
 
+    var isYTDLPAvailable: Bool {
+        return onlineVideoService.isAvailable
+    }
+
     // MARK: - Initialization
     init() {
         // Model loading happens in WhisperService via whisper-cli subprocess
@@ -154,12 +159,12 @@ class TranscriptViewModel: ObservableObject {
 
         Task {
             do {
-                let finalTranscript = try await processFileInternal(url: url) { message, progress in
+                let finalTranscript = try await processFileInternal(url: url, sourceURL: url) { message, progress in
                     self.updateLoading(message, progress: progress)
                 }
 
                 self.transcript = finalTranscript
-                self.archiveTranscript(finalTranscript)
+                self.archiveTranscript(finalTranscript, sourceType: .localFile)
                 self.progress = 1.0
                 self.loadingMessage = "完成！"
                 cleanupTempFiles()
@@ -173,8 +178,49 @@ class TranscriptViewModel: ObservableObject {
         }
     }
 
+    func processOnlineVideo(urlString: String) {
+        guard !isLoading else { return }
+
+        isLoading = true
+        error = nil
+        transcript = nil
+        player = nil
+        isVideoFile = false
+        progress = 0.0
+
+        Task {
+            var download: OnlineVideoDownload?
+            do {
+                updateLoading("正在下载在线视频音频...", progress: 0.05)
+                let downloadedVideo = try onlineVideoService.downloadAudio(from: urlString)
+                download = downloadedVideo
+
+                let finalTranscript = try await processFileInternal(
+                    url: downloadedVideo.audioURL,
+                    sourceURL: downloadedVideo.originalURL,
+                    sourceTitle: downloadedVideo.title
+                ) { message, progress in
+                    self.updateLoading(message, progress: 0.1 + progress * 0.9)
+                }
+
+                self.transcript = finalTranscript
+                self.archiveTranscript(finalTranscript, sourceType: .onlineVideo)
+                self.progress = 1.0
+                self.loadingMessage = "完成！"
+            } catch {
+                self.error = error.localizedDescription
+            }
+
+            if let download {
+                onlineVideoService.cleanup(download: download)
+            }
+            cleanupTempFiles()
+            isLoading = false
+        }
+    }
+
     /// Core pipeline: preprocess → transcribe → diarize → return Transcript
-    private func processFileInternal(url: URL, onProgress: ((String, Double) -> Void)? = nil) async throws -> Transcript {
+    private func processFileInternal(url: URL, sourceURL: URL, sourceTitle: String? = nil, onProgress: ((String, Double) -> Void)? = nil) async throws -> Transcript {
         // Step 1: Preprocess audio
         onProgress?("正在准备音频文件...", 0.1)
         let wavPath = try preprocessAudio(inputPath: url.path)
@@ -193,7 +239,8 @@ class TranscriptViewModel: ObservableObject {
         let duration = try audioService.getAudioDuration(path: url.path)
 
         return Transcript(
-            sourceURL: url,
+            sourceURL: sourceURL,
+            sourceTitle: sourceTitle,
             segments: diarizedSegments,
             duration: duration
         )
@@ -273,7 +320,7 @@ class TranscriptViewModel: ObservableObject {
         let exportFormat = format ?? selectedFormat
         let panel = NSSavePanel()
         panel.title = "导出文稿"
-        panel.nameFieldStringValue = "\(transcript.sourceURL.deletingPathExtension().lastPathComponent)_transcript.\(exportService.fileExtension(for: exportFormat))"
+        panel.nameFieldStringValue = "\(transcript.displayTitle)_transcript.\(exportService.fileExtension(for: exportFormat))"
         panel.allowedContentTypes = [.text, .json, .html]
 
         panel.begin { [weak self] result in
@@ -318,16 +365,16 @@ class TranscriptViewModel: ObservableObject {
 
             let videoExtensions = ["mp4", "mov", "avi", "mkv", "webm", "m4v"]
             let sourceURL = archivedTranscript.sourceURL
-            isVideoFile = videoExtensions.contains(sourceURL.pathExtension.lowercased())
+            isVideoFile = sourceURL.isFileURL && videoExtensions.contains(sourceURL.pathExtension.lowercased())
             player = isVideoFile ? AVPlayer(url: sourceURL) : nil
         } catch {
             self.error = "打开历史项目失败：\(error.localizedDescription)"
         }
     }
 
-    private func archiveTranscript(_ transcript: Transcript) {
+    private func archiveTranscript(_ transcript: Transcript, sourceType: ProjectSourceType) {
         do {
-            let project = try historyStore.saveTranscriptProject(transcript: transcript)
+            let project = try historyStore.saveTranscriptProject(transcript: transcript, sourceType: sourceType)
             selectedProjectID = project.id
             historyProjects = try historyStore.loadProjects()
         } catch {
@@ -417,7 +464,7 @@ class TranscriptViewModel: ObservableObject {
                 updateLoading("批量处理 \(index + 1)/\(batchQueue.count): \(url.lastPathComponent)", progress: 0)
 
                 do {
-                    let finalTranscript = try await processFileInternal(url: url) { [weak self] message, progress in
+                    let finalTranscript = try await processFileInternal(url: url, sourceURL: url) { [weak self] message, progress in
                         guard let self = self else { return }
                         let overallProgress = Double(index) / Double(self.batchQueue.count) + progress / Double(self.batchQueue.count)
                         self.updateLoading("批量 \(index + 1)/\(self.batchQueue.count): \(message)", progress: overallProgress)
@@ -428,7 +475,7 @@ class TranscriptViewModel: ObservableObject {
                     let ext = exportService.fileExtension(for: batchExportFormat)
                     let outputPath = batchExportDirectory!.appendingPathComponent("\(filename).\(ext)").path
                     try exportService.export(transcript: finalTranscript, format: batchExportFormat, outputPath: outputPath)
-                    archiveTranscript(finalTranscript)
+                    archiveTranscript(finalTranscript, sourceType: .localFile)
 
                     batchResults.append(BatchResult(url: url, success: true, error: nil))
 

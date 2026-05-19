@@ -58,9 +58,7 @@ struct WorkspaceSidebar: View {
         VStack(spacing: 8) {
             SidebarActionButton(icon: "plus", title: "导入本地文件", isSelected: false, action: openFilePicker)
             SidebarActionButton(icon: "square.stack.3d.up", title: "批量处理", isSelected: false, action: openBatchPicker)
-            SidebarActionButton(icon: "link", title: "粘贴在线视频", isSelected: false) {
-                viewModel.error = "在线视频转化会在下一阶段接入 yt-dlp"
-            }
+            SidebarActionButton(icon: "link", title: "粘贴在线视频", isSelected: false, action: openOnlineVideoPrompt)
         }
         .padding(.horizontal, 18)
     }
@@ -112,6 +110,7 @@ struct WorkspaceSidebar: View {
             StatusIndicator(available: viewModel.isModelLoaded, label: "Whisper")
             StatusIndicator(available: viewModel.isPythonAvailable, label: "Python")
             StatusIndicator(available: viewModel.isFFmpegAvailable, label: "FFmpeg")
+            StatusIndicator(available: viewModel.isYTDLPAvailable, label: "yt-dlp")
         }
         .padding(.horizontal, 22)
         .padding(.bottom, 18)
@@ -148,6 +147,23 @@ struct WorkspaceSidebar: View {
             viewModel.batchQueue = panel.urls
             viewModel.showBatchSetup = true
         }
+    }
+
+    private func openOnlineVideoPrompt() {
+        let alert = NSAlert()
+        alert.messageText = "粘贴在线视频链接"
+        alert.informativeText = "第一版支持 yt-dlp 可解析的公开视频链接。"
+        alert.addButton(withTitle: "开始转写")
+        alert.addButton(withTitle: "取消")
+
+        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 420, height: 24))
+        textField.placeholderString = "https://..."
+        alert.accessoryView = textField
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let urlString = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        selectedPanel = .transcript
+        viewModel.processOnlineVideo(urlString: urlString)
     }
 }
 
@@ -222,4 +238,3 @@ private struct HistoryProjectRow: View {
         return formatter.string(from: date)
     }
 }
-

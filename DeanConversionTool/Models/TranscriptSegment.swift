@@ -52,14 +52,16 @@ struct TranscriptSegment: Identifiable, Codable {
 struct Transcript: Identifiable, Codable {
     let id: UUID
     let sourceURL: URL
+    let sourceTitle: String?
     let createdAt: Date
     var segments: [TranscriptSegment]
     let language: String?
     let duration: TimeInterval
 
-    init(id: UUID = UUID(), sourceURL: URL, createdAt: Date = Date(), segments: [TranscriptSegment], language: String? = nil, duration: TimeInterval = 0) {
+    init(id: UUID = UUID(), sourceURL: URL, sourceTitle: String? = nil, createdAt: Date = Date(), segments: [TranscriptSegment], language: String? = nil, duration: TimeInterval = 0) {
         self.id = id
         self.sourceURL = sourceURL
+        self.sourceTitle = sourceTitle
         self.createdAt = createdAt
         self.segments = segments
         self.language = language
@@ -83,4 +85,17 @@ struct Transcript: Identifiable, Codable {
         return Array(speakers).sorted()
     }
 
+    var displayTitle: String {
+        if let sourceTitle, !sourceTitle.isEmpty {
+            return sourceTitle
+        }
+        if sourceURL.isFileURL {
+            return sourceURL.deletingPathExtension().lastPathComponent
+        }
+        return sourceURL.host ?? sourceURL.absoluteString
+    }
+
+    var displaySource: String {
+        sourceURL.isFileURL ? sourceURL.path : sourceURL.absoluteString
+    }
 }

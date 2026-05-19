@@ -55,7 +55,7 @@ class ExportService {
     /// Generate Markdown format
     private func generateMarkdown(transcript: Transcript) -> String {
         var md = "# 逐字稿\n\n"
-        md += "来源: \(transcript.sourceURL.lastPathComponent)\n"
+        md += "来源: \(transcript.displaySource)\n"
         md += "创建时间: \(transcript.createdAt.formatted())\n"
         md += "时长: \(formatDuration(transcript.duration))\n"
         md += "说话人数量: \(transcript.speakerCount)\n\n"
@@ -83,7 +83,7 @@ class ExportService {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>逐字稿 - \(transcript.sourceURL.lastPathComponent)</title>
+            <title>逐字稿 - \(transcript.displayTitle)</title>
             <style>
                 body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
                 .header { border-bottom: 2px solid #007AFF; padding-bottom: 10px; margin-bottom: 20px; }
@@ -97,7 +97,7 @@ class ExportService {
         <body>
             <div class="header">
                 <h1>逐字稿</h1>
-                <p>来源: \(transcript.sourceURL.lastPathComponent)</p>
+                <p>来源: \(transcript.displaySource)</p>
                 <p>创建时间: \(transcript.createdAt.formatted())</p>
                 <p>时长: \(formatDuration(transcript.duration)) | 说话人: \(transcript.speakerCount)</p>
             </div>

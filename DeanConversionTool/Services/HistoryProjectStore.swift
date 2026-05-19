@@ -42,7 +42,7 @@ final class HistoryProjectStore {
     func saveTranscriptProject(transcript: Transcript, sourceType: ProjectSourceType = .localFile) throws -> HistoryProject {
         try ensureProjectsDirectory()
 
-        let title = transcript.sourceURL.deletingPathExtension().lastPathComponent
+        let title = transcript.displayTitle
         let createdAt = transcript.createdAt
         let projectID = transcript.id
         let projectDirectory = projectsRootURL.appendingPathComponent(
@@ -65,7 +65,7 @@ final class HistoryProjectStore {
             id: projectID,
             title: title,
             sourceType: sourceType,
-            sourceLocation: transcript.sourceURL.path,
+            sourceLocation: transcript.sourceURL.isFileURL ? transcript.sourceURL.path : transcript.sourceURL.absoluteString,
             createdAt: createdAt,
             updatedAt: Date(),
             duration: transcript.duration,
