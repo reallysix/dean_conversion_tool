@@ -2,6 +2,9 @@ import Foundation
 
 final class ModelDownloadService: NSObject, URLSessionDownloadDelegate {
     private let modelURL = URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin")!
+    static let modelName = "Whisper large-v3"
+    static let modelFileName = "ggml-large-v3.bin"
+    static let modelSizeDescription = "约 3.1GB"
 
     private var session: URLSession?
     private var task: URLSessionDownloadTask?
@@ -68,6 +71,13 @@ final class ModelDownloadService: NSObject, URLSessionDownloadDelegate {
             let temporaryURL = destinationURL.appendingPathExtension("download")
             try? FileManager.default.removeItem(at: temporaryURL)
             try FileManager.default.moveItem(at: location, to: temporaryURL)
+            let attributes = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)
+            let fileSize = attributes[.size] as? NSNumber
+            guard (fileSize?.int64Value ?? 0) > 0 else {
+                try? FileManager.default.removeItem(at: temporaryURL)
+                finish(.failure(ModelDownloadError.invalidFile))
+                return
+            }
             try? FileManager.default.removeItem(at: destinationURL)
             try FileManager.default.moveItem(at: temporaryURL, to: destinationURL)
             finish(.success(()))
@@ -95,11 +105,14 @@ final class ModelDownloadService: NSObject, URLSessionDownloadDelegate {
 
 enum ModelDownloadError: LocalizedError {
     case missingDestination
+    case invalidFile
 
     var errorDescription: String? {
         switch self {
         case .missingDestination:
             return "模型下载目标路径不可用"
+        case .invalidFile:
+            return "模型文件下载不完整，请重试"
         }
     }
 }

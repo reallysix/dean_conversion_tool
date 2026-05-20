@@ -48,6 +48,7 @@ class TranscriptViewModel: ObservableObject {
     @Published var isDownloadingModel = false
     @Published var modelDownloadProgress = 0.0
     @Published var modelDownloadMessage = ""
+    @Published var modelDownloadIsError = false
     @Published var exportStatusMessage: String?
     @Published var exportStatusIsError = false
     @Published var lastExportedFileURL: URL?
@@ -144,6 +145,18 @@ class TranscriptViewModel: ObservableObject {
 
     var whisperModelPath: String {
         return whisperService.modelPath
+    }
+
+    var whisperModelName: String {
+        return ModelDownloadService.modelName
+    }
+
+    var whisperModelSizeDescription: String {
+        return ModelDownloadService.modelSizeDescription
+    }
+
+    var whisperModelDirectory: String {
+        return URL(fileURLWithPath: whisperModelPath).deletingLastPathComponent().path
     }
 
     var isPythonAvailable: Bool {
@@ -597,6 +610,7 @@ class TranscriptViewModel: ObservableObject {
         isDownloadingModel = true
         modelDownloadProgress = 0
         modelDownloadMessage = "正在连接模型下载源..."
+        modelDownloadIsError = false
         error = nil
 
         modelDownloadService.downloadModel(to: destinationURL) { [weak self] progress in
@@ -611,13 +625,16 @@ class TranscriptViewModel: ObservableObject {
             case .success:
                 self.modelDownloadProgress = 1
                 self.modelDownloadMessage = "模型已就绪"
+                self.modelDownloadIsError = false
                 self.objectWillChange.send()
             case .failure(let downloadError):
                 if (downloadError as NSError).code == NSURLErrorCancelled {
                     self.modelDownloadMessage = "模型下载已取消"
+                    self.modelDownloadIsError = false
                 } else {
-                    self.modelDownloadMessage = "模型下载失败"
-                    self.error = "模型下载失败：\(downloadError.localizedDescription)"
+                    self.modelDownloadMessage = "模型下载失败：\(downloadError.localizedDescription)"
+                    self.modelDownloadIsError = true
+                    self.error = nil
                 }
             }
         }
@@ -628,6 +645,7 @@ class TranscriptViewModel: ObservableObject {
         modelDownloadService.cancel()
         isDownloadingModel = false
         modelDownloadMessage = "模型下载已取消"
+        modelDownloadIsError = false
     }
 
     private func cleanupTempFiles() {

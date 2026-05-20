@@ -13,7 +13,7 @@ Dean Conversion Tool 是一款 macOS 原生音视频转文字工具。它基于 
 - 在线视频：支持粘贴 `yt-dlp` 可解析的公开视频链接，并将原始链接保存到历史项目。
 - 历史记录：按视频标题归档转写结果、字幕和文本文件，不复制原始音视频。
 - 环境检查：右侧任务状态会统一显示 Whisper、模型、FFmpeg、`yt-dlp`、`deno` 和可选说话人识别状态。
-- 模型下载：模型缺失时可在应用内下载，并显示下载进度、取消和目录入口。
+- 模型下载：模型缺失时可在应用内下载，并显示模型大小、保存位置、下载进度、取消、失败重试和下载源入口。
 - 视频预览：视频文件可在应用内播放，并按时间戳跳转。
 - 多格式导出：支持 SRT、TXT、Markdown、HTML、JSON。
 - 原生界面：SwiftUI 构建，适配 macOS 桌面工作流。
@@ -56,7 +56,7 @@ Scripts/check_dependencies.sh --install
 
 ## 下载 Whisper 模型
 
-应用右侧「环境」区域会在模型缺失时显示「下载模型」，可直接在应用内下载到默认目录。
+应用右侧「环境」区域会在模型缺失时显示模型信息和「下载模型」，可直接在应用内下载到默认目录。当前版本固定使用 `Whisper large-v3`，模型文件约 3.1GB。
 
 ```bash
 ./download_model.sh
@@ -67,6 +67,10 @@ Scripts/check_dependencies.sh --install
 ```text
 ~/Library/Application Support/DeanConversion/models/
 ```
+
+如果下载失败，右侧「环境」区域会保留失败原因并提供「重试下载」。也可以点击「下载源」在浏览器中打开 Hugging Face 模型地址。
+
+第一版安装包不内置 Whisper 模型，避免 DMG 体积过大。正式发布默认策略是安装后按需下载 `Whisper large-v3`。
 
 ## 构建与启动
 

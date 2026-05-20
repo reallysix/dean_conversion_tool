@@ -4,7 +4,6 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("defaultLanguage") private var defaultLanguage = "auto"
     @AppStorage("enableSpeakerDiarization") private var enableSpeakerDiarization = true
-    @AppStorage("whisperModelSize") private var whisperModelSize = "large-v3"
     @State private var selectedTab = 0
 
     private let tabs = [
@@ -45,8 +44,7 @@ struct SettingsView: View {
                 switch selectedTab {
                 case 0:
                     GeneralSettingsView(
-                        defaultLanguage: $defaultLanguage,
-                        whisperModelSize: $whisperModelSize
+                        defaultLanguage: $defaultLanguage
                     )
                 case 1:
                     FeatureSettingsView(
@@ -66,7 +64,6 @@ struct SettingsView: View {
 /// General settings
 struct GeneralSettingsView: View {
     @Binding var defaultLanguage: String
-    @Binding var whisperModelSize: String
 
     let languages = [
         ("auto", "自动检测"),
@@ -79,14 +76,6 @@ struct GeneralSettingsView: View {
         ("de", "德语")
     ]
 
-    let modelSizes = [
-        ("tiny", "Tiny (~75MB)"),
-        ("base", "Base (~142MB)"),
-        ("small", "Small (~466MB)"),
-        ("medium", "Medium (~1.5GB)"),
-        ("large-v3", "Large V3 (~3.1GB)")
-    ]
-
     var body: some View {
         Form {
             Section("转写设置") {
@@ -96,14 +85,12 @@ struct GeneralSettingsView: View {
                     }
                 }
 
-                Picker("Whisper 模型", selection: $whisperModelSize) {
-                    ForEach(modelSizes, id: \.0) { size, name in
-                        Text(name).tag(size)
-                    }
+                LabeledContent("Whisper 模型") {
+                    Text("Large V3 (~3.1GB)")
+                        .foregroundColor(AppTheme.textSecondary)
                 }
-                .help("更大的模型更准确但更慢")
 
-                Text("注意：更改模型需要重启应用")
+                Text("当前版本固定使用 large-v3。后续会再开放多模型切换。")
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textSecondary)
             }

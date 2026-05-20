@@ -138,49 +138,13 @@ struct EnvironmentStatusPanel: View {
             }
 
             if viewModel.isDownloadingModel {
-                HStack(spacing: 10) {
-                    ProgressView(value: viewModel.modelDownloadProgress)
-                        .progressViewStyle(.linear)
-                    Text("\(Int(viewModel.modelDownloadProgress * 100))%")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppTheme.textSecondary)
-                        .frame(width: 34, alignment: .trailing)
-                    Button(action: viewModel.cancelModelDownload) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(AppTheme.textSecondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 4)
+                ModelDownloadProgressView(viewModel: viewModel)
             } else if !viewModel.isWhisperModelAvailable {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("模型约 3GB，会保存到应用支持目录。下载完成后可离线转写。")
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textTertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack(spacing: 10) {
-                        Button(action: viewModel.downloadWhisperModel) {
-                            Text("下载模型")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(AppTheme.textPrimary)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button(action: viewModel.openModelDirectory) {
-                            Text("打开目录")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(AppTheme.accent)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.top, 4)
+                ModelDownloadPrompt(viewModel: viewModel)
             } else if !viewModel.modelDownloadMessage.isEmpty {
                 Text(viewModel.modelDownloadMessage)
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.success)
+                    .foregroundColor(viewModel.modelDownloadIsError ? AppTheme.danger : AppTheme.success)
                     .padding(.top, 2)
             }
 
@@ -205,6 +169,85 @@ struct EnvironmentStatusPanel: View {
                     .lineLimit(2)
             }
         }
+    }
+}
+
+struct ModelDownloadProgressView: View {
+    @ObservedObject var viewModel: TranscriptViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 10) {
+                ProgressView(value: viewModel.modelDownloadProgress)
+                    .progressViewStyle(.linear)
+                Text("\(Int(viewModel.modelDownloadProgress * 100))%")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary)
+                    .frame(width: 34, alignment: .trailing)
+                Button(action: viewModel.cancelModelDownload) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(AppTheme.textSecondary)
+                }
+                .buttonStyle(.plain)
+                .help("取消下载")
+            }
+
+            Text(viewModel.modelDownloadMessage)
+                .font(.system(size: 10))
+                .foregroundColor(AppTheme.textTertiary)
+                .lineLimit(2)
+        }
+        .padding(.top, 4)
+    }
+}
+
+struct ModelDownloadPrompt: View {
+    @ObservedObject var viewModel: TranscriptViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(viewModel.whisperModelName) · \(viewModel.whisperModelSizeDescription)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+                Text("用于本地离线转写。下载后保存到：\(viewModel.whisperModelDirectory)")
+                    .font(.system(size: 10))
+                    .foregroundColor(AppTheme.textTertiary)
+                    .lineLimit(3)
+            }
+
+            if !viewModel.modelDownloadMessage.isEmpty {
+                Text(viewModel.modelDownloadMessage)
+                    .font(.system(size: 10))
+                    .foregroundColor(viewModel.modelDownloadIsError ? AppTheme.danger : AppTheme.textTertiary)
+                    .lineLimit(3)
+            }
+
+            HStack(spacing: 10) {
+                Button(action: viewModel.downloadWhisperModel) {
+                    Text(viewModel.modelDownloadIsError ? "重试下载" : "下载模型")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: viewModel.openModelDirectory) {
+                    Text("打开目录")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppTheme.accent)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: viewModel.openModelDownloadPage) {
+                    Text("下载源")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppTheme.accent)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 4)
     }
 }
 
