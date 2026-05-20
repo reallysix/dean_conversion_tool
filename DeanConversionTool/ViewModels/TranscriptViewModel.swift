@@ -3,7 +3,6 @@ import SwiftUI
 import Combine
 import AVFoundation
 import AVKit
-import UniformTypeIdentifiers
 
 /// Separate selection manager to avoid triggering ViewModel re-renders
 @MainActor
@@ -360,24 +359,22 @@ class TranscriptViewModel: ObservableObject {
         guard let transcript = transcript else { return }
 
         let exportFormat = format ?? selectedFormat
-        let panel = NSSavePanel()
-        panel.title = "导出文稿"
-        panel.nameFieldStringValue = "\(transcript.displayTitle)_transcript.\(exportService.fileExtension(for: exportFormat))"
-        panel.allowedContentTypes = [exportContentType(for: exportFormat)]
+        let panel = NSOpenPanel()
+        panel.title = "选择导出目录"
+        panel.prompt = "导出"
+        panel.message = "将在所选目录中生成 \(exportService.formatDisplayName(for: exportFormat))"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
         panel.canCreateDirectories = true
-        panel.isExtensionHidden = false
+        panel.allowsMultipleSelection = false
 
-        guard panel.runModal() == .OK, var url = panel.url else { return }
-        let expectedExtension = exportService.fileExtension(for: exportFormat)
-        if url.pathExtension.lowercased() != expectedExtension {
-            url.deletePathExtension()
-            url.appendPathExtension(expectedExtension)
-        }
+        guard panel.runModal() == .OK, let directoryURL = panel.url else { return }
+        let url = uniqueExportURL(in: directoryURL, transcript: transcript, format: exportFormat)
 
-        let didAccess = url.startAccessingSecurityScopedResource()
+        let didAccess = directoryURL.startAccessingSecurityScopedResource()
         defer {
             if didAccess {
-                url.stopAccessingSecurityScopedResource()
+                directoryURL.stopAccessingSecurityScopedResource()
             }
         }
 
@@ -394,19 +391,33 @@ class TranscriptViewModel: ObservableObject {
         }
     }
 
-    private func exportContentType(for format: ExportFormat) -> UTType {
-        switch format {
-        case .srt:
-            return UTType(filenameExtension: "srt") ?? .plainText
-        case .txt:
-            return .plainText
-        case .markdown:
-            return UTType(filenameExtension: "md") ?? .plainText
-        case .html:
-            return .html
-        case .json:
-            return .json
+    private func uniqueExportURL(in directoryURL: URL, transcript: Transcript, format: ExportFormat) -> URL {
+        let fileExtension = exportService.fileExtension(for: format)
+        let baseName = sanitizedFileName("\(transcript.displayTitle)_transcript")
+        var candidate = directoryURL.appendingPathComponent(baseName).appendingPathExtension(fileExtension)
+        var index = 2
+
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            candidate = directoryURL
+                .appendingPathComponent("\(baseName) \(index)")
+                .appendingPathExtension(fileExtension)
+            index += 1
         }
+
+        return candidate
+    }
+
+    private func sanitizedFileName(_ name: String) -> String {
+        let invalidCharacters = CharacterSet(charactersIn: "/\\?%*|\"<>:")
+            .union(.newlines)
+            .union(.controlCharacters)
+
+        let sanitized = name
+            .components(separatedBy: invalidCharacters)
+            .joined(separator: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return sanitized.isEmpty ? "transcript" : sanitized
     }
 
     // MARK: - History
