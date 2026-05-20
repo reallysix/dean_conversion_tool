@@ -2,11 +2,17 @@ import Foundation
 
 /// Service for preprocessing audio/video files to whisper-compatible format
 class AudioPreprocessingService {
-    private let ffmpegPath = "/opt/homebrew/bin/ffmpeg"
+    private var ffmpegPath: String? {
+        executablePath(named: "ffmpeg")
+    }
+
+    private var ffprobePath: String? {
+        executablePath(named: "ffprobe")
+    }
 
     /// Check if ffmpeg is available
     var isFFmpegAvailable: Bool {
-        return FileManager.default.fileExists(atPath: ffmpegPath)
+        return ffmpegPath != nil && ffprobePath != nil
     }
 
     /// Convert any audio/video file to whisper-compatible WAV format (16kHz, mono, 16-bit PCM)
@@ -25,6 +31,10 @@ class AudioPreprocessingService {
         }
 
         let process = Process()
+        guard let ffmpegPath else {
+            throw AudioPreprocessingError.ffmpegNotFound
+        }
+
         process.executableURL = URL(fileURLWithPath: ffmpegPath)
         process.arguments = [
             "-i", inputPath,
@@ -87,7 +97,11 @@ class AudioPreprocessingService {
         }
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffprobe")
+        guard let ffprobePath else {
+            throw AudioPreprocessingError.ffmpegNotFound
+        }
+
+        process.executableURL = URL(fileURLWithPath: ffprobePath)
         process.arguments = [
             "-v", "error",
             "-show_entries", "format=duration",
@@ -115,7 +129,11 @@ class AudioPreprocessingService {
         }
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffprobe")
+        guard let ffprobePath else {
+            throw AudioPreprocessingError.ffmpegNotFound
+        }
+
+        process.executableURL = URL(fileURLWithPath: ffprobePath)
         process.arguments = [
             "-v", "error",
             "-show_format",
@@ -166,6 +184,41 @@ class AudioPreprocessingService {
     /// Clean up temporary WAV file
     func cleanupTempFile(_ path: String) {
         try? FileManager.default.removeItem(atPath: path)
+    }
+
+    private func executablePath(named name: String) -> String? {
+        let candidates = [
+            "/opt/homebrew/bin/\(name)",
+            "/usr/local/bin/\(name)",
+            "/usr/bin/\(name)"
+        ]
+
+        if let match = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+            return match
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["which", name]
+        var environment = ProcessInfo.processInfo.environment
+        let fallbackPath = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        environment["PATH"] = "\(fallbackPath):\(environment["PATH"] ?? "")"
+        process.environment = environment
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return output?.isEmpty == false ? output : nil
+        } catch {
+            return nil
+        }
     }
 }
 

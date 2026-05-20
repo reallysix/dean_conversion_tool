@@ -30,11 +30,11 @@
 
 ## 依赖检测与安装体验
 
-- [ ] 完善首次启动依赖检查体验。
-- [ ] 对 `yt-dlp` 缺失提供清晰安装提示。
-- [ ] 对 `ffmpeg/ffprobe` 缺失提供清晰安装提示。
-- [ ] 对 `deno` 缺失提供 YouTube 解析相关提示。
-- [ ] 明确是否允许 App 调用 Homebrew 自动安装依赖。
+- [x] 完善首次启动依赖检查体验。
+- [x] 对 `yt-dlp` 缺失提供清晰安装提示。
+- [x] 对 `ffmpeg/ffprobe` 缺失提供清晰安装提示。
+- [x] 对 `deno` 缺失提供 YouTube 解析相关提示。
+- [x] 明确是否允许 App 调用 Homebrew 自动安装依赖。
 - [ ] 将 `Scripts/check_dependencies.sh --install` 接入打包或首次启动流程。
 
 ## 模型下载与分发

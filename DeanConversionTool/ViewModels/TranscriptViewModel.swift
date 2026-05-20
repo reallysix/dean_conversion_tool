@@ -3,6 +3,7 @@ import SwiftUI
 import Combine
 import AVFoundation
 import AVKit
+import AppKit
 
 /// Separate selection manager to avoid triggering ViewModel re-renders
 @MainActor
@@ -50,6 +51,7 @@ class TranscriptViewModel: ObservableObject {
     @Published var exportStatusMessage: String?
     @Published var exportStatusIsError = false
     @Published var lastExportedFileURL: URL?
+    @Published var setupClipboardMessage: String?
 
     // Selection is managed separately to avoid re-renders
     let selectionManager = SelectionManager()
@@ -80,6 +82,8 @@ class TranscriptViewModel: ObservableObject {
         let name: String
         let isAvailable: Bool
         let detail: String
+        let installCommand: String?
+        let isRequired: Bool
     }
 
     // Cached filtered segments
@@ -154,14 +158,63 @@ class TranscriptViewModel: ObservableObject {
         return onlineVideoService.isAvailable
     }
 
+    var isDenoAvailable: Bool {
+        return onlineVideoService.isDenoAvailable
+    }
+
     var setupStatusItems: [SetupStatusItem] {
         [
-            SetupStatusItem(name: "Whisper CLI", isAvailable: isWhisperCLIAvailable, detail: "brew install whisper-cpp"),
-            SetupStatusItem(name: "Whisper 模型", isAvailable: isWhisperModelAvailable, detail: whisperModelPath),
-            SetupStatusItem(name: "FFmpeg", isAvailable: isFFmpegAvailable, detail: "brew install ffmpeg"),
-            SetupStatusItem(name: "yt-dlp", isAvailable: isYTDLPAvailable, detail: "brew install yt-dlp"),
-            SetupStatusItem(name: "Python 说话人识别", isAvailable: isPythonAvailable, detail: "可选：pyannote.audio")
+            SetupStatusItem(
+                name: "Whisper CLI",
+                isAvailable: isWhisperCLIAvailable,
+                detail: "本地转写核心工具",
+                installCommand: "brew install whisper-cpp",
+                isRequired: true
+            ),
+            SetupStatusItem(
+                name: "Whisper 模型",
+                isAvailable: isWhisperModelAvailable,
+                detail: "保存位置：\(whisperModelPath)",
+                installCommand: nil,
+                isRequired: true
+            ),
+            SetupStatusItem(
+                name: "FFmpeg / ffprobe",
+                isAvailable: isFFmpegAvailable,
+                detail: "音视频转码与时长读取",
+                installCommand: "brew install ffmpeg",
+                isRequired: true
+            ),
+            SetupStatusItem(
+                name: "yt-dlp",
+                isAvailable: isYTDLPAvailable,
+                detail: "在线公开视频解析",
+                installCommand: "brew install yt-dlp",
+                isRequired: true
+            ),
+            SetupStatusItem(
+                name: "Deno",
+                isAvailable: isDenoAvailable,
+                detail: "YouTube 解析建议安装",
+                installCommand: "brew install deno",
+                isRequired: false
+            ),
+            SetupStatusItem(
+                name: "Python 说话人识别",
+                isAvailable: isPythonAvailable,
+                detail: "可选：pyannote.audio",
+                installCommand: nil,
+                isRequired: false
+            )
         ]
+    }
+
+    var requiredSetupMissingCount: Int {
+        setupStatusItems.filter { $0.isRequired && !$0.isAvailable }.count
+    }
+
+    var optionalSetupMissingCount: Int {
+        setupStatusItems.filter { !$0.isRequired && !$0.isAvailable }.count
     }
 
     // MARK: - Initialization
@@ -514,6 +567,17 @@ class TranscriptViewModel: ObservableObject {
         }
 
         return true
+    }
+
+    func copyInstallCommand(_ command: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(command, forType: .string)
+        setupClipboardMessage = "已复制：\(command)"
+        error = nil
+    }
+
+    func copyDependencyCheckCommand() {
+        copyInstallCommand("Scripts/check_dependencies.sh --install")
     }
 
     func openModelDirectory() {

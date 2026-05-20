@@ -59,6 +59,10 @@ Scripts/package_app.sh --skip-dependency-check
 - The app still depends on local command-line tools such as `whisper-cli`, `ffmpeg`, `ffprobe`, `yt-dlp`, and `deno`.
 - The Whisper model is not bundled. The app should download or locate it at runtime.
 
+## Dependency Install Policy
+
+The app should not silently run Homebrew installs on launch. The first distributable version should detect missing tools in the right-side environment panel and let the user copy explicit install commands. `Scripts/check_dependencies.sh --install` remains the user-initiated path for installing all command-line dependencies.
+
 ## Release Checklist
 
 - [ ] Run `Scripts/package_app.sh`.

@@ -11,6 +11,10 @@ final class OnlineVideoService {
         ytDLPPath != nil
     }
 
+    var isDenoAvailable: Bool {
+        denoPath != nil
+    }
+
     func downloadAudio(from urlString: String) throws -> OnlineVideoDownload {
         guard let originalURL = URL(string: urlString), originalURL.scheme != nil else {
             throw OnlineVideoError.invalidURL

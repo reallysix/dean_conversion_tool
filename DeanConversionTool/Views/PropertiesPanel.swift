@@ -125,9 +125,16 @@ struct EnvironmentStatusPanel: View {
     @ObservedObject var viewModel: TranscriptViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 10) {
+            EnvironmentSummary(
+                missingRequired: viewModel.requiredSetupMissingCount,
+                missingOptional: viewModel.optionalSetupMissingCount
+            )
+
             ForEach(viewModel.setupStatusItems) { item in
-                EnvironmentStatusRow(item: item)
+                EnvironmentStatusRow(item: item) { command in
+                    viewModel.copyInstallCommand(command)
+                }
             }
 
             if viewModel.isDownloadingModel {
@@ -147,20 +154,27 @@ struct EnvironmentStatusPanel: View {
                 }
                 .padding(.top, 4)
             } else if !viewModel.isWhisperModelAvailable {
-                HStack(spacing: 10) {
-                    Button(action: viewModel.downloadWhisperModel) {
-                        Text("下载模型")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(AppTheme.textPrimary)
-                    }
-                    .buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("模型约 3GB，会保存到应用支持目录。下载完成后可离线转写。")
+                        .font(.system(size: 10))
+                        .foregroundColor(AppTheme.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    Button(action: viewModel.openModelDirectory) {
-                        Text("打开目录")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(AppTheme.accent)
+                    HStack(spacing: 10) {
+                        Button(action: viewModel.downloadWhisperModel) {
+                            Text("下载模型")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(AppTheme.textPrimary)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: viewModel.openModelDirectory) {
+                            Text("打开目录")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppTheme.accent)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(.top, 4)
             } else if !viewModel.modelDownloadMessage.isEmpty {
@@ -169,35 +183,124 @@ struct EnvironmentStatusPanel: View {
                     .foregroundColor(AppTheme.success)
                     .padding(.top, 2)
             }
+
+            if viewModel.requiredSetupMissingCount > 0 {
+                Button(action: viewModel.copyDependencyCheckCommand) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "terminal")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("复制一键检查命令")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(AppTheme.textPrimary)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
+            }
+
+            if let message = viewModel.setupClipboardMessage {
+                Text(message)
+                    .font(.system(size: 10))
+                    .foregroundColor(AppTheme.success)
+                    .lineLimit(2)
+            }
         }
+    }
+}
+
+struct EnvironmentSummary: View {
+    let missingRequired: Int
+    let missingOptional: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(missingRequired == 0 ? AppTheme.success : AppTheme.danger)
+            Text(message)
+                .font(.system(size: 10))
+                .foregroundColor(AppTheme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.bottom, 2)
+    }
+
+    private var title: String {
+        if missingRequired == 0 {
+            return "核心环境已就绪"
+        }
+        return "还缺 \(missingRequired) 项核心依赖"
+    }
+
+    private var message: String {
+        if missingRequired > 0 {
+            return "先补齐核心依赖，再导入本地文件或在线视频。"
+        }
+        if missingOptional > 0 {
+            return "可选能力缺失不影响基础转写。"
+        }
+        return "本地转写和在线视频解析都可以开始使用。"
     }
 }
 
 struct EnvironmentStatusRow: View {
     let item: TranscriptViewModel.SetupStatusItem
+    let copyAction: (String) -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             Circle()
-                .fill(item.isAvailable ? AppTheme.success : AppTheme.danger)
+                .fill(statusColor)
                 .frame(width: 7, height: 7)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(item.name)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(AppTheme.textSecondary)
-                    .lineLimit(1)
-                if !item.isAvailable {
-                    Text(item.detail)
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textTertiary)
+                .padding(.top, 5)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(item.name)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppTheme.textSecondary)
                         .lineLimit(1)
+                    Text(item.isRequired ? "必需" : "可选")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(item.isRequired ? AppTheme.textPrimary : AppTheme.textTertiary)
+                }
+                Text(item.isAvailable ? "已检测到" : item.detail)
+                    .font(.system(size: 10))
+                    .foregroundColor(AppTheme.textTertiary)
+                    .lineLimit(2)
+
+                if !item.isAvailable, let command = item.installCommand {
+                    Button(action: { copyAction(command) }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text(command)
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(AppTheme.accent)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             Spacer(minLength: 4)
-            Text(item.isAvailable ? "就绪" : "缺失")
+            Text(statusText)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(item.isAvailable ? AppTheme.success : AppTheme.danger)
+                .foregroundColor(statusColor)
         }
+    }
+
+    private var statusText: String {
+        if item.isAvailable {
+            return "就绪"
+        }
+        return item.isRequired ? "缺失" : "建议"
+    }
+
+    private var statusColor: Color {
+        if item.isAvailable {
+            return AppTheme.success
+        }
+        return item.isRequired ? AppTheme.danger : AppTheme.accentWarm
     }
 }
 

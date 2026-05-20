@@ -33,15 +33,6 @@ struct NavSidebar: View {
             }
 
             Spacer()
-
-            // Status indicators
-            VStack(spacing: 4) {
-                StatusIndicator(available: viewModel.isModelLoaded, label: "Whisper")
-                StatusIndicator(available: viewModel.isPythonAvailable, label: "Python")
-                StatusIndicator(available: viewModel.isFFmpegAvailable, label: "FFmpeg")
-            }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 16)
         }
         .frame(width: AppTheme.navRailWidth)
         .background(AppTheme.sidebarBackground)
@@ -70,24 +61,5 @@ struct NavItem: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: action)
         .help(label)
-    }
-}
-
-struct StatusIndicator: View {
-    let available: Bool
-    let label: String
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(available ? Color.green : AppTheme.danger)
-                .frame(width: 6, height: 6)
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundColor(available ? AppTheme.textSecondary : AppTheme.danger)
-            Spacer()
-        }
-        .frame(width: 48)
-        .help("\(label): \(available ? "可用" : "不可用")")
     }
 }
