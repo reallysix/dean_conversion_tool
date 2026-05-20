@@ -106,6 +106,9 @@ struct TranscriptContainerView: View {
             if let player = viewModel.player, viewModel.isVideoFile {
                 CompactVideoPlayerView(player: player)
                 Rectangle().fill(AppTheme.border).frame(height: 1)
+            } else if let sourceURL = viewModel.transcript?.sourceURL, !sourceURL.isFileURL {
+                OnlineVideoEmbedView(sourceURL: sourceURL)
+                Rectangle().fill(AppTheme.border).frame(height: 1)
             }
 
             WorkspaceHeader(viewModel: viewModel)
@@ -219,6 +222,7 @@ struct WelcomeView: View {
 
                     ActionPanel(icon: "link", title: "在线视频", subtitle: "YouTube、B 站、抖音等公开链接") {
                         VStack(spacing: 10) {
+                            let inputState = viewModel.onlineVideoInputState
                             HStack(spacing: 8) {
                                 Image(systemName: "globe")
                                     .foregroundColor(AppTheme.textTertiary)
@@ -236,11 +240,22 @@ struct WelcomeView: View {
                             )
                             .cornerRadius(AppTheme.cornerRadiusMedium)
 
-                            PrimaryActionButton(icon: "arrow.down.circle", title: "解析并转写") {
-                                viewModel.processOnlineVideo(urlString: viewModel.onlineVideoURL)
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(inputState.isReady ? AppTheme.success : AppTheme.textTertiary.opacity(0.6))
+                                    .frame(width: 6, height: 6)
+                                Text(inputState.message)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(inputState.isReady ? AppTheme.success : AppTheme.textTertiary)
+                                    .lineLimit(1)
+                                Spacer(minLength: 0)
                             }
-                            .disabled(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            .opacity(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+
+                            PrimaryActionButton(icon: "arrow.down.circle", title: "解析并转写") {
+                                viewModel.processOnlineVideo(urlString: inputState.normalizedURLString ?? viewModel.onlineVideoURL)
+                            }
+                            .disabled(!inputState.isReady)
+                            .opacity(inputState.isReady ? 1 : 0.45)
                         }
                     }
                 }

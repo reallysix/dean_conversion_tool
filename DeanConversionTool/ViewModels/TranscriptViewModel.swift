@@ -87,6 +87,13 @@ class TranscriptViewModel: ObservableObject {
         let isRequired: Bool
     }
 
+    struct OnlineVideoInputState {
+        let normalizedURLString: String?
+        let platformName: String?
+        let message: String
+        let isReady: Bool
+    }
+
     // Cached filtered segments
     private var cachedSegments: [TranscriptSegment] = []
     private var cachedSearchText: String?
@@ -230,6 +237,37 @@ class TranscriptViewModel: ObservableObject {
         setupStatusItems.filter { !$0.isRequired && !$0.isAvailable }.count
     }
 
+    var onlineVideoInputState: OnlineVideoInputState {
+        let trimmed = onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return OnlineVideoInputState(
+                normalizedURLString: nil,
+                platformName: nil,
+                message: "粘贴公开视频链接后会自动识别平台",
+                isReady: false
+            )
+        }
+
+        guard let normalized = normalizedOnlineVideoURLString(from: trimmed),
+              let url = URL(string: normalized),
+              let host = url.host?.lowercased() else {
+            return OnlineVideoInputState(
+                normalizedURLString: nil,
+                platformName: nil,
+                message: "链接格式不对，请粘贴完整的视频地址",
+                isReady: false
+            )
+        }
+
+        let platformName = onlineVideoPlatformName(host: host)
+        return OnlineVideoInputState(
+            normalizedURLString: normalized,
+            platformName: platformName,
+            message: "已识别：\(platformName ?? "公开网页视频")",
+            isReady: true
+        )
+    }
+
     // MARK: - Initialization
     init() {
         // Model loading happens in WhisperService via whisper-cli subprocess
@@ -289,6 +327,10 @@ class TranscriptViewModel: ObservableObject {
             error = "请先粘贴在线视频链接"
             return
         }
+        guard let normalizedURLString = normalizedOnlineVideoURLString(from: trimmedURL) else {
+            error = "视频链接无效，请检查后再试"
+            return
+        }
         guard validateRequiredSetup(includeOnlineVideo: true) else { return }
 
         isLoading = true
@@ -302,7 +344,7 @@ class TranscriptViewModel: ObservableObject {
             var download: OnlineVideoDownload?
             do {
                 updateLoading("正在下载在线视频音频...", progress: 0.05)
-                let downloadedVideo = try onlineVideoService.downloadAudio(from: trimmedURL)
+                let downloadedVideo = try onlineVideoService.downloadAudio(from: normalizedURLString)
                 download = downloadedVideo
 
                 let finalTranscript = try await processFileInternal(
@@ -580,6 +622,48 @@ class TranscriptViewModel: ObservableObject {
         }
 
         return true
+    }
+
+    private func normalizedOnlineVideoURLString(from value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let candidate: String
+        if trimmed.contains("://") {
+            candidate = trimmed
+        } else if trimmed.hasPrefix("www.") || trimmed.contains(".") {
+            candidate = "https://\(trimmed)"
+        } else {
+            candidate = trimmed
+        }
+
+        guard let url = URL(string: candidate),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host?.isEmpty == false else {
+            return nil
+        }
+
+        return candidate
+    }
+
+    private func onlineVideoPlatformName(host: String) -> String? {
+        if host.contains("youtube.com") || host.contains("youtu.be") {
+            return "YouTube"
+        }
+        if host.contains("bilibili.com") || host.contains("b23.tv") {
+            return "B 站"
+        }
+        if host.contains("douyin.com") {
+            return "抖音"
+        }
+        if host.contains("tiktok.com") {
+            return "TikTok"
+        }
+        if host.contains("vimeo.com") {
+            return "Vimeo"
+        }
+        return nil
     }
 
     func copyInstallCommand(_ command: String) {

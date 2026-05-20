@@ -194,8 +194,23 @@ enum OnlineVideoError: LocalizedError {
         if lowercased.contains("unsupported url") {
             return "暂不支持这个链接，请确认它是公开视频链接。"
         }
-        if lowercased.contains("private video") || lowercased.contains("sign in") || lowercased.contains("login") {
+        if lowercased.contains("private video") || lowercased.contains("this video is private") {
+            return "这是私密视频，当前版本仅支持公开视频。"
+        }
+        if lowercased.contains("sign in") || lowercased.contains("login") || lowercased.contains("cookies") {
             return "这个视频需要登录或权限，当前版本仅支持公开视频。"
+        }
+        if lowercased.contains("not available in your country") ||
+            lowercased.contains("geo restricted") ||
+            lowercased.contains("georestricted") ||
+            lowercased.contains("region") {
+            return "这个视频有地区限制，当前网络环境无法解析。"
+        }
+        if lowercased.contains("copyright") || lowercased.contains("removed") {
+            return "这个视频可能已下架或受到版权限制，无法解析。"
+        }
+        if lowercased.contains("age-restricted") || lowercased.contains("age restricted") {
+            return "这个视频有年龄或登录限制，当前版本无法解析。"
         }
         if lowercased.contains("video unavailable") || lowercased.contains("not available") {
             return "视频不可用，请确认链接可以在浏览器中正常打开。"
