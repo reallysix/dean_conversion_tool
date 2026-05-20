@@ -8,52 +8,45 @@ struct ContentView: View {
     @State private var selectedPanel: SidePanel = .transcript
 
     var body: some View {
-        ZStack {
-            AppTheme.background.ignoresSafeArea()
+        HStack(spacing: 0) {
+            WorkspaceSidebar(viewModel: viewModel, selectedPanel: $selectedPanel)
 
-            HStack(spacing: 0) {
-                WorkspaceSidebar(viewModel: viewModel, selectedPanel: $selectedPanel)
+            Rectangle()
+                .fill(AppTheme.border)
+                .frame(width: 1)
 
-                Rectangle()
-                    .fill(AppTheme.border)
-                    .frame(width: 1)
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    ZStack {
+                        TranscriptContainerView(viewModel: viewModel)
+                            .opacity(selectedPanel == .transcript ? 1 : 0)
+                            .allowsHitTesting(selectedPanel == .transcript)
 
-                VStack(spacing: 0) {
-                    HStack(spacing: 0) {
-                        ZStack {
-                            TranscriptContainerView(viewModel: viewModel)
-                                .opacity(selectedPanel == .transcript ? 1 : 0)
-                                .allowsHitTesting(selectedPanel == .transcript)
-
-                            EmbeddedSettingsView()
-                                .opacity(selectedPanel == .settings ? 1 : 0)
-                                .allowsHitTesting(selectedPanel == .settings)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-
-                        Rectangle()
-                            .fill(AppTheme.border)
-                            .frame(width: 1)
-
-                        PropertiesPanel(viewModel: viewModel)
-                            .frame(width: AppTheme.propertiesPanelWidth)
+                        EmbeddedSettingsView()
+                            .opacity(selectedPanel == .settings ? 1 : 0)
+                            .allowsHitTesting(selectedPanel == .settings)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
 
                     Rectangle()
                         .fill(AppTheme.border)
-                        .frame(height: 1)
-                    BottomBar(viewModel: viewModel)
-                        .frame(height: AppTheme.bottomBarHeight)
+                        .frame(width: 1)
+
+                    PropertiesPanel(viewModel: viewModel)
+                        .frame(width: AppTheme.propertiesPanelWidth)
                 }
+
+                Rectangle()
+                    .fill(AppTheme.border)
+                    .frame(height: 1)
+                BottomBar(viewModel: viewModel)
+                    .frame(height: AppTheme.bottomBarHeight)
             }
-            .background(AppTheme.workspace)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: .black.opacity(0.05), radius: 24, x: 0, y: 18)
-            .padding(28)
         }
         .frame(minWidth: 1100, minHeight: 680)
-        .background(AppTheme.background)
+        .background(AppTheme.workspace)
+        .ignoresSafeArea(.container, edges: .top)
         .onDrop(of: [.fileURL], isTargeted: $isDragOver) { providers in
             handleDrop(providers: providers)
         }

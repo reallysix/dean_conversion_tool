@@ -54,8 +54,8 @@ struct WorkspaceSidebar: View {
                 .foregroundColor(AppTheme.textPrimary)
         }
         .padding(.horizontal, 22)
-        .padding(.top, 24)
-        .padding(.bottom, 28)
+        .padding(.top, 58)
+        .padding(.bottom, 22)
     }
 
     private var importActions: some View {
