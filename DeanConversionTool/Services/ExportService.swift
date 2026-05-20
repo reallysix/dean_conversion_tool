@@ -25,7 +25,15 @@ class ExportService {
             content = try generateJSON(transcript: transcript)
         }
 
-        try content.write(toFile: outputPath, atomically: true, encoding: .utf8)
+        guard !outputPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw ExportError.invalidPath
+        }
+
+        do {
+            try content.write(toFile: outputPath, atomically: true, encoding: .utf8)
+        } catch {
+            throw ExportError.writeFailed(error)
+        }
     }
 
     /// Generate SRT (SubRip) format

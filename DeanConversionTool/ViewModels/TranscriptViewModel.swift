@@ -3,6 +3,7 @@ import SwiftUI
 import Combine
 import AVFoundation
 import AVKit
+import UniformTypeIdentifiers
 
 /// Separate selection manager to avoid triggering ViewModel re-renders
 @MainActor
@@ -362,22 +363,45 @@ class TranscriptViewModel: ObservableObject {
         let panel = NSSavePanel()
         panel.title = "导出文稿"
         panel.nameFieldStringValue = "\(transcript.displayTitle)_transcript.\(exportService.fileExtension(for: exportFormat))"
-        panel.allowedContentTypes = [.text, .json, .html]
+        panel.allowedContentTypes = [exportContentType(for: exportFormat)]
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
 
         panel.begin { [weak self] result in
-            guard result == .OK, let url = panel.url else { return }
+            guard let self, result == .OK, var url = panel.url else { return }
+            let expectedExtension = self.exportService.fileExtension(for: exportFormat)
+            if url.pathExtension.lowercased() != expectedExtension {
+                url.deletePathExtension()
+                url.appendPathExtension(expectedExtension)
+            }
 
             do {
-                try self?.exportService.export(
+                try self.exportService.export(
                     transcript: transcript,
                     format: exportFormat,
                     outputPath: url.path
                 )
+                self.error = nil
             } catch {
                 Task { @MainActor in
-                    self?.error = "导出失败：\(error.localizedDescription)"
+                    self.error = "导出失败：\(error.localizedDescription)"
                 }
             }
+        }
+    }
+
+    private func exportContentType(for format: ExportFormat) -> UTType {
+        switch format {
+        case .srt:
+            return UTType(filenameExtension: "srt") ?? .plainText
+        case .txt:
+            return .plainText
+        case .markdown:
+            return UTType(filenameExtension: "md") ?? .plainText
+        case .html:
+            return .html
+        case .json:
+            return .json
         }
     }
 
