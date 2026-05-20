@@ -31,6 +31,7 @@ Dean Conversion Tool 是一款 macOS 原生音视频转文字工具。它基于 
 brew install whisper-cpp
 brew install ffmpeg
 brew install yt-dlp
+brew install deno
 brew install xcodegen
 pip3 install --break-system-packages pyannote.audio torch torchaudio
 ```
@@ -47,7 +48,7 @@ Scripts/check_dependencies.sh
 Scripts/check_dependencies.sh --install
 ```
 
-后续打包安装包时，应在安装阶段调用同一套检查逻辑，确保用户首次启动前已经具备 `whisper-cli`、FFmpeg 和 `yt-dlp`。
+后续打包安装包时，应在安装阶段调用同一套检查逻辑，确保用户首次启动前已经具备 `whisper-cli`、FFmpeg、`yt-dlp` 和 `deno`。
 
 说话人识别依赖 Hugging Face 模型授权。首次使用前可能需要登录 Hugging Face 并接受 pyannote 模型许可。
 
@@ -194,6 +195,15 @@ which ffmpeg
 ```bash
 brew install yt-dlp
 which yt-dlp
+```
+
+### YouTube 解析提示缺少 JavaScript runtime
+
+确认已安装：
+
+```bash
+brew install deno
+which deno
 ```
 
 ### 说话人识别不可用

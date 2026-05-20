@@ -13,6 +13,7 @@ REQUIRED_TOOLS=(
     "ffmpeg:ffmpeg"
     "ffprobe:ffmpeg"
     "yt-dlp:yt-dlp"
+    "deno:deno"
 )
 
 missing_packages=()

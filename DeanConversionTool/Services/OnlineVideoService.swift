@@ -26,14 +26,26 @@ final class OnlineVideoService {
         let outputTemplate = tempDirectory.appendingPathComponent("%(title).200B-%(id)s.%(ext)s").path
         let process = Process()
         process.executableURL = URL(fileURLWithPath: ytDLPPath)
-        process.arguments = [
+        process.environment = processEnvironment
+
+        var arguments = [
             "--no-playlist",
             "--extract-audio",
             "--audio-format", "m4a",
             "--print", "after_move:%(title)s",
             "--output", outputTemplate,
-            originalURL.absoluteString
         ]
+
+        if let ffmpegLocation {
+            arguments.append(contentsOf: ["--ffmpeg-location", ffmpegLocation])
+        }
+
+        if let denoPath {
+            arguments.append(contentsOf: ["--js-runtimes", "deno:\(denoPath)"])
+        }
+
+        arguments.append(originalURL.absoluteString)
+        process.arguments = arguments
 
         let outputPipe = Pipe()
         let errorPipe = Pipe()
@@ -81,11 +93,49 @@ final class OnlineVideoService {
     }
 
     private var ytDLPPath: String? {
-        let candidates = [
+        return executablePath(named: "yt-dlp", candidates: [
             "/opt/homebrew/bin/yt-dlp",
             "/usr/local/bin/yt-dlp",
             "/usr/bin/yt-dlp"
-        ]
+        ])
+    }
+
+    private var ffmpegLocation: String? {
+        if let ffmpegPath = executablePath(named: "ffmpeg", candidates: [
+            "/opt/homebrew/bin/ffmpeg",
+            "/usr/local/bin/ffmpeg",
+            "/usr/bin/ffmpeg"
+        ]) {
+            return URL(fileURLWithPath: ffmpegPath).deletingLastPathComponent().path
+        }
+
+        return nil
+    }
+
+    private var denoPath: String? {
+        executablePath(named: "deno", candidates: [
+            "/opt/homebrew/bin/deno",
+            "/usr/local/bin/deno",
+            "/usr/bin/deno"
+        ])
+    }
+
+    private var processEnvironment: [String: String] {
+        var environment = ProcessInfo.processInfo.environment
+        let fallbackPath = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        if let path = environment["PATH"], !path.isEmpty {
+            environment["PATH"] = "\(fallbackPath):\(path)"
+        } else {
+            environment["PATH"] = fallbackPath
+        }
+        return environment
+    }
+
+    private func executablePath(named name: String, candidates: [String]) -> String? {
+        let candidates = [
+            candidates,
+            ["/opt/homebrew/bin/\(name)", "/usr/local/bin/\(name)", "/usr/bin/\(name)"]
+        ].flatMap { $0 }
 
         if let match = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
             return match
@@ -93,7 +143,8 @@ final class OnlineVideoService {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["which", "yt-dlp"]
+        process.arguments = ["which", name]
+        process.environment = processEnvironment
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = Pipe()
@@ -130,4 +181,3 @@ enum OnlineVideoError: LocalizedError {
         }
     }
 }
-

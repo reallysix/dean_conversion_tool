@@ -35,6 +35,7 @@ The pipeline test depends on local tools and models:
 - `/opt/homebrew/bin/whisper-cli`
 - `/opt/homebrew/bin/ffmpeg`
 - `yt-dlp` on `PATH` or in common Homebrew locations
+- `deno` for YouTube JavaScript-based extraction paths
 - `~/Library/Application Support/DeanConversion/models/ggml-large-v3.bin`
 - Python 3 with `pyannote.audio` for speaker diarization checks
 
