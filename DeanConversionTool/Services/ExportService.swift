@@ -208,6 +208,7 @@ enum ExportFormat: String, CaseIterable {
 enum ExportError: LocalizedError {
     case invalidPath
     case writeFailed(Error)
+    case fileNotCreated(String)
     case encodingFailed
 
     var errorDescription: String? {
@@ -216,6 +217,8 @@ enum ExportError: LocalizedError {
             return "输出路径无效"
         case .writeFailed(let error):
             return "文件写入失败：\(error.localizedDescription)"
+        case .fileNotCreated(let path):
+            return "写入完成后没有找到文件：\(path)"
         case .encodingFailed:
             return "文稿编码失败"
         }

@@ -46,6 +46,14 @@ struct PropertiesPanel: View {
                                 viewModel.exportTranscript(format: format)
                             }
                         }
+                        if let message = viewModel.exportStatusMessage {
+                            ExportStatusView(
+                                message: message,
+                                isError: viewModel.exportStatusIsError,
+                                fileURL: viewModel.lastExportedFileURL,
+                                revealAction: viewModel.revealLastExportedFile
+                            )
+                        }
                     }
                 } else {
                     EmptyPropertiesPanel(viewModel: viewModel)
@@ -257,6 +265,41 @@ struct PropertyButton: View {
                 .cornerRadius(AppTheme.cornerRadiusSmall)
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct ExportStatusView: View {
+    let message: String
+    let isError: Bool
+    let fileURL: URL?
+    let revealAction: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 6) {
+                Circle()
+                    .fill(isError ? AppTheme.danger : AppTheme.success)
+                    .frame(width: 7, height: 7)
+                    .padding(.top, 4)
+                Text(message)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(isError ? AppTheme.danger : AppTheme.success)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let fileURL {
+                Text(fileURL.deletingLastPathComponent().path)
+                    .font(.system(size: 10))
+                    .foregroundColor(AppTheme.textTertiary)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+
+                PropertyButton(title: "在访达中显示") {
+                    revealAction()
+                }
+            }
+        }
+        .padding(.top, 4)
     }
 }
 

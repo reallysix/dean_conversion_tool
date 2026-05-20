@@ -47,6 +47,9 @@ class TranscriptViewModel: ObservableObject {
     @Published var isDownloadingModel = false
     @Published var modelDownloadProgress = 0.0
     @Published var modelDownloadMessage = ""
+    @Published var exportStatusMessage: String?
+    @Published var exportStatusIsError = false
+    @Published var lastExportedFileURL: URL?
 
     // Selection is managed separately to avoid re-renders
     let selectionManager = SelectionManager()
@@ -359,6 +362,10 @@ class TranscriptViewModel: ObservableObject {
         guard let transcript = transcript else { return }
 
         let exportFormat = format ?? selectedFormat
+        exportStatusMessage = nil
+        exportStatusIsError = false
+        lastExportedFileURL = nil
+
         let panel = NSOpenPanel()
         panel.title = "选择导出目录"
         panel.prompt = "导出"
@@ -384,11 +391,27 @@ class TranscriptViewModel: ObservableObject {
                 format: exportFormat,
                 outputPath: url.path
             )
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                throw ExportError.fileNotCreated(url.path)
+            }
+
             error = nil
+            exportStatusMessage = "已导出：\(url.lastPathComponent)"
+            exportStatusIsError = false
+            lastExportedFileURL = url
             NSWorkspace.shared.activateFileViewerSelecting([url])
         } catch {
-            self.error = "导出失败：\(error.localizedDescription)"
+            let message = "导出失败：\(error.localizedDescription)"
+            self.error = message
+            exportStatusMessage = message
+            exportStatusIsError = true
+            lastExportedFileURL = nil
         }
+    }
+
+    func revealLastExportedFile() {
+        guard let lastExportedFileURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([lastExportedFileURL])
     }
 
     private func uniqueExportURL(in directoryURL: URL, transcript: Transcript, format: ExportFormat) -> URL {
