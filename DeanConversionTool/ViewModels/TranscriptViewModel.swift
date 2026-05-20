@@ -367,26 +367,30 @@ class TranscriptViewModel: ObservableObject {
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
 
-        panel.begin { [weak self] result in
-            guard let self, result == .OK, var url = panel.url else { return }
-            let expectedExtension = self.exportService.fileExtension(for: exportFormat)
-            if url.pathExtension.lowercased() != expectedExtension {
-                url.deletePathExtension()
-                url.appendPathExtension(expectedExtension)
-            }
+        guard panel.runModal() == .OK, var url = panel.url else { return }
+        let expectedExtension = exportService.fileExtension(for: exportFormat)
+        if url.pathExtension.lowercased() != expectedExtension {
+            url.deletePathExtension()
+            url.appendPathExtension(expectedExtension)
+        }
 
-            do {
-                try self.exportService.export(
-                    transcript: transcript,
-                    format: exportFormat,
-                    outputPath: url.path
-                )
-                self.error = nil
-            } catch {
-                Task { @MainActor in
-                    self.error = "导出失败：\(error.localizedDescription)"
-                }
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
             }
+        }
+
+        do {
+            try exportService.export(
+                transcript: transcript,
+                format: exportFormat,
+                outputPath: url.path
+            )
+            error = nil
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            self.error = "导出失败：\(error.localizedDescription)"
         }
     }
 
