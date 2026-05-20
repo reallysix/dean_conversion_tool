@@ -12,6 +12,8 @@ Dean Conversion Tool 是一款 macOS 原生音视频转文字工具。它基于 
 - 批量处理：支持多文件批量转写并自动导出。
 - 在线视频：支持粘贴 `yt-dlp` 可解析的公开视频链接，并将原始链接保存到历史项目。
 - 历史记录：按视频标题归档转写结果、字幕和文本文件，不复制原始音视频。
+- 环境检查：右侧任务状态会统一显示 Whisper、模型、FFmpeg、`yt-dlp`、`deno` 和可选说话人识别状态。
+- 模型下载：模型缺失时可在应用内下载，并显示下载进度、取消和目录入口。
 - 视频预览：视频文件可在应用内播放，并按时间戳跳转。
 - 多格式导出：支持 SRT、TXT、Markdown、HTML、JSON。
 - 原生界面：SwiftUI 构建，适配 macOS 桌面工作流。
@@ -42,19 +44,19 @@ pip3 install --break-system-packages pyannote.audio torch torchaudio
 Scripts/check_dependencies.sh
 ```
 
-如果需要自动通过 Homebrew 安装缺失工具：
+如果用户明确希望通过 Homebrew 安装缺失工具，可以手动运行：
 
 ```bash
 Scripts/check_dependencies.sh --install
 ```
 
-后续打包安装包时，应在安装阶段调用同一套检查逻辑，确保用户首次启动前已经具备 `whisper-cli`、FFmpeg、`yt-dlp` 和 `deno`。
+当前策略是：App 不会在首次启动时静默调用 Homebrew 自动安装依赖。应用会在右侧“环境”区域检测缺失项，并提供可复制的安装命令；打包脚本会默认运行 `Scripts/check_dependencies.sh` 做本机依赖检查。
 
 说话人识别依赖 Hugging Face 模型授权。首次使用前可能需要登录 Hugging Face 并接受 pyannote 模型许可。
 
 ## 下载 Whisper 模型
 
-应用首页的「启动检查」会在模型缺失时显示「下载模型」，可直接在应用内下载到默认目录。
+应用右侧「环境」区域会在模型缺失时显示「下载模型」，可直接在应用内下载到默认目录。
 
 ```bash
 ./download_model.sh
@@ -82,17 +84,34 @@ open DeanConversionTool.xcodeproj
 
 然后选择 `DeanConversionTool` scheme，按 `Cmd + R` 运行。
 
+## 打包 DMG
+
+当前支持生成本地未签名 `.dmg`，用于安装包流程和非 Xcode 启动验证：
+
+```bash
+Scripts/package_app.sh
+```
+
+输出路径：
+
+```text
+build/package/Release/Dean Conversion Tool.dmg
+```
+
+打包脚本会先检查本机依赖、生成 Xcode 项目、构建 Release `.app`、校验必要资源，然后创建 DMG。当前安装包还未做正式签名和 notarization 公证。
+
 ## 使用流程
 
 1. 启动应用。
-2. 点击导入按钮，或将音频/视频文件拖入窗口；也可以点击“粘贴在线视频”输入公开的视频链接。
-3. 等待处理流程完成：
+2. 在右侧“环境”区域确认核心依赖和模型状态。
+3. 点击导入按钮，或将音频/视频文件拖入窗口；也可以在在线链接输入框粘贴公开的视频链接。
+4. 等待处理流程完成：
    - 在线视频音频下载
    - 音频预处理
    - Whisper 转写
    - 说话人识别，可选
-4. 浏览逐字稿、搜索内容、选择片段或跳转视频时间点。
-5. 导出为需要的格式。
+5. 浏览逐字稿、搜索内容、选择片段或跳转视频时间点。
+6. 导出为需要的格式。选择目录后，应用会显示导出结果和最终保存路径。
 
 历史项目默认保存在：
 
@@ -127,6 +146,9 @@ DeanConversionTool/
 ├── Services/
 │   ├── AudioPreprocessingService.swift
 │   ├── ExportService.swift
+│   ├── HistoryProjectStore.swift
+│   ├── ModelDownloadService.swift
+│   ├── OnlineVideoService.swift
 │   ├── SpeakerDiarizationService.swift
 │   └── WhisperService.swift
 ├── ViewModels/
@@ -140,11 +162,16 @@ DeanConversionTool/
 │   ├── SettingsView.swift
 │   ├── Theme.swift
 │   ├── TranscriptView.swift
-│   └── VideoPlayerView.swift
+│   ├── VideoPlayerView.swift
+│   └── WorkspaceSidebar.swift
 └── DeanConversionToolApp.swift
 
 PythonHelpers/
 └── speaker_diarization.py
+
+Scripts/
+├── check_dependencies.sh
+└── package_app.sh
 ```
 
 ## 验证
@@ -152,6 +179,12 @@ PythonHelpers/
 ```bash
 xcodegen generate
 xcodebuild -project DeanConversionTool.xcodeproj -scheme DeanConversionTool -configuration Debug build
+```
+
+打包验证：
+
+```bash
+Scripts/package_app.sh
 ```
 
 集成测试脚本：

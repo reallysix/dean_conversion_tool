@@ -35,7 +35,8 @@
 - [x] 对 `ffmpeg/ffprobe` 缺失提供清晰安装提示。
 - [x] 对 `deno` 缺失提供 YouTube 解析相关提示。
 - [x] 明确是否允许 App 调用 Homebrew 自动安装依赖。
-- [ ] 将 `Scripts/check_dependencies.sh --install` 接入打包或首次启动流程。
+- [x] 打包流程接入 `Scripts/check_dependencies.sh` 依赖检查。
+- [ ] 设计用户确认后的依赖安装入口，必要时再调用 `Scripts/check_dependencies.sh --install`。
 
 ## 模型下载与分发
 
