@@ -107,7 +107,8 @@ struct WorkspaceSidebar: View {
 
     private var statusSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            StatusIndicator(available: viewModel.isModelLoaded, label: "Whisper")
+            StatusIndicator(available: viewModel.isWhisperCLIAvailable, label: "Whisper")
+            StatusIndicator(available: viewModel.isWhisperModelAvailable, label: "模型")
             StatusIndicator(available: viewModel.isPythonAvailable, label: "Python")
             StatusIndicator(available: viewModel.isFFmpegAvailable, label: "FFmpeg")
             StatusIndicator(available: viewModel.isYTDLPAvailable, label: "yt-dlp")

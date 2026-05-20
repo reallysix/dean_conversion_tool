@@ -43,6 +43,7 @@ class TranscriptViewModel: ObservableObject {
     @Published var selectedFormat: ExportFormat = .markdown
     @Published var historyProjects: [HistoryProject] = []
     @Published var selectedProjectID: UUID?
+    @Published var onlineVideoURL = ""
 
     // Selection is managed separately to avoid re-renders
     let selectionManager = SelectionManager()
@@ -66,6 +67,13 @@ class TranscriptViewModel: ObservableObject {
         let url: URL
         let success: Bool
         let error: String?
+    }
+
+    struct SetupStatusItem: Identifiable {
+        let id = UUID()
+        let name: String
+        let isAvailable: Bool
+        let detail: String
     }
 
     // Cached filtered segments
@@ -115,6 +123,18 @@ class TranscriptViewModel: ObservableObject {
         return whisperService.isModelLoaded
     }
 
+    var isWhisperCLIAvailable: Bool {
+        return whisperService.isCLIAvailable
+    }
+
+    var isWhisperModelAvailable: Bool {
+        return whisperService.isModelAvailable
+    }
+
+    var whisperModelPath: String {
+        return whisperService.modelPath
+    }
+
     var isPythonAvailable: Bool {
         return diarizationService.isAvailable
     }
@@ -125,6 +145,16 @@ class TranscriptViewModel: ObservableObject {
 
     var isYTDLPAvailable: Bool {
         return onlineVideoService.isAvailable
+    }
+
+    var setupStatusItems: [SetupStatusItem] {
+        [
+            SetupStatusItem(name: "Whisper CLI", isAvailable: isWhisperCLIAvailable, detail: "brew install whisper-cpp"),
+            SetupStatusItem(name: "Whisper 模型", isAvailable: isWhisperModelAvailable, detail: whisperModelPath),
+            SetupStatusItem(name: "FFmpeg", isAvailable: isFFmpegAvailable, detail: "brew install ffmpeg"),
+            SetupStatusItem(name: "yt-dlp", isAvailable: isYTDLPAvailable, detail: "brew install yt-dlp"),
+            SetupStatusItem(name: "Python 说话人识别", isAvailable: isPythonAvailable, detail: "可选：pyannote.audio")
+        ]
     }
 
     // MARK: - Initialization
@@ -138,6 +168,7 @@ class TranscriptViewModel: ObservableObject {
     /// Process an audio/video file through the full pipeline (single-file mode)
     func processFile(url: URL) {
         guard !isLoading else { return }
+        guard validateRequiredSetup(includeOnlineVideo: false) else { return }
 
         isLoading = true
         error = nil
@@ -180,6 +211,12 @@ class TranscriptViewModel: ObservableObject {
 
     func processOnlineVideo(urlString: String) {
         guard !isLoading else { return }
+        let trimmedURL = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedURL.isEmpty else {
+            error = "请先粘贴在线视频链接"
+            return
+        }
+        guard validateRequiredSetup(includeOnlineVideo: true) else { return }
 
         isLoading = true
         error = nil
@@ -192,7 +229,7 @@ class TranscriptViewModel: ObservableObject {
             var download: OnlineVideoDownload?
             do {
                 updateLoading("正在下载在线视频音频...", progress: 0.05)
-                let downloadedVideo = try onlineVideoService.downloadAudio(from: urlString)
+                let downloadedVideo = try onlineVideoService.downloadAudio(from: trimmedURL)
                 download = downloadedVideo
 
                 let finalTranscript = try await processFileInternal(
@@ -387,6 +424,42 @@ class TranscriptViewModel: ObservableObject {
     private func updateLoading(_ message: String, progress: Double) {
         self.loadingMessage = message
         self.progress = progress
+    }
+
+    private func validateRequiredSetup(includeOnlineVideo: Bool) -> Bool {
+        var missing: [String] = []
+
+        if !isWhisperCLIAvailable {
+            missing.append("Whisper CLI")
+        }
+        if !isWhisperModelAvailable {
+            missing.append("Whisper 模型")
+        }
+        if !isFFmpegAvailable {
+            missing.append("FFmpeg")
+        }
+        if includeOnlineVideo && !isYTDLPAvailable {
+            missing.append("yt-dlp")
+        }
+
+        guard missing.isEmpty else {
+            error = "开始前还缺少：\(missing.joined(separator: "、"))。请先按右侧状态或 README 完成安装。"
+            return false
+        }
+
+        return true
+    }
+
+    func openModelDirectory() {
+        let modelURL = URL(fileURLWithPath: whisperModelPath).deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: modelURL, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(modelURL)
+    }
+
+    func openModelDownloadPage() {
+        if let url = URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func cleanupTempFiles() {

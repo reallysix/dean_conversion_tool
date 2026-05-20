@@ -29,6 +29,7 @@ struct AppTheme {
     static let accent            = Color(hex: 0x007AFF)
     static let accentWarm        = Color(hex: 0xFFD23F)
     static let accentSubtle      = Color(hex: 0x007AFF).opacity(0.08)
+    static let success           = Color(hex: 0x22A06B)
     static let danger            = Color(hex: 0xE53E3E)
 
     // MARK: - Speaker Colors

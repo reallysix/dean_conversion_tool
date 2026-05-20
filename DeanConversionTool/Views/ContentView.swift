@@ -209,63 +209,68 @@ struct WelcomeView: View {
     @ObservedObject var viewModel: TranscriptViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            VStack(spacing: 8) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 40))
-                    .foregroundColor(AppTheme.accent)
-                    .padding(.bottom, 12)
-
-                Text("语音转文字工具")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(AppTheme.textPrimary)
-
-                Text("拖拽音频或视频文件到此处开始转写")
-                    .font(.system(size: 14))
-                    .foregroundColor(AppTheme.textSecondary)
-                    .padding(.bottom, 16)
-
-                Button(action: { openFilePicker() }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 14))
-                        Text("选择文件")
-                            .font(.system(size: 14, weight: .medium))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 26) {
+                HStack(alignment: .center, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("转写工作台")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+                        Text("导入本地文件，或粘贴在线视频链接开始转写。历史记录会自动归档。")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary)
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(AppTheme.accent)
-                    .cornerRadius(AppTheme.cornerRadiusMedium)
-                }
-                .buttonStyle(.plain)
 
-                Button(action: { openBatchPicker() }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 14))
-                        Text("批量处理")
-                            .font(.system(size: 14, weight: .medium))
+                    Spacer()
+
+                    Image(systemName: "waveform.badge.magnifyingglass")
+                        .font(.system(size: 34, weight: .medium))
+                        .foregroundColor(AppTheme.accent)
+                        .frame(width: 72, height: 72)
+                        .background(AppTheme.accentSubtle)
+                        .cornerRadius(AppTheme.cornerRadiusMedium)
+                }
+
+                HStack(alignment: .top, spacing: 16) {
+                    ActionPanel(icon: "folder", title: "本地文件", subtitle: "音频、视频、批量文件") {
+                        VStack(spacing: 10) {
+                            PrimaryActionButton(icon: "plus", title: "导入本地文件", action: openFilePicker)
+                            SecondaryActionButton(icon: "square.stack.3d.up", title: "批量处理", action: openBatchPicker)
+                        }
                     }
-                    .foregroundColor(AppTheme.accent)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(AppTheme.accent.opacity(0.1))
-                    .cornerRadius(AppTheme.cornerRadiusMedium)
+
+                    ActionPanel(icon: "link", title: "在线视频", subtitle: "YouTube、B 站、抖音等公开视频") {
+                        VStack(spacing: 10) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "globe")
+                                    .foregroundColor(AppTheme.textTertiary)
+                                    .frame(width: 18)
+                                TextField("https://...", text: $viewModel.onlineVideoURL)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 13))
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(height: 40)
+                            .background(AppTheme.background)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMedium)
+                                    .stroke(AppTheme.border)
+                            )
+                            .cornerRadius(AppTheme.cornerRadiusMedium)
+
+                            PrimaryActionButton(icon: "arrow.down.circle", title: "解析并转写") {
+                                viewModel.processOnlineVideo(urlString: viewModel.onlineVideoURL)
+                            }
+                            .disabled(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .opacity(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
-            }
-            .padding(.bottom, 40)
 
-            HStack(spacing: 16) {
-                WelcomeCard(icon: "waveform", title: "语音转写", description: "基于 Whisper AI\n本地离线转写")
-                WelcomeCard(icon: "person.2", title: "说话人识别", description: "自动识别\n不同说话人")
-                WelcomeCard(icon: "square.and.arrow.up", title: "多格式导出", description: "SRT / TXT / Markdown\nHTML / JSON")
+                SetupChecklist(viewModel: viewModel)
             }
-
-            Spacer()
+            .padding(28)
+            .frame(maxWidth: 860)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppTheme.background)
@@ -303,33 +308,145 @@ struct WelcomeView: View {
     }
 }
 
-struct WelcomeCard: View {
+struct ActionPanel<Content: View>: View {
     let icon: String
     let title: String
-    let description: String
+    let subtitle: String
+    @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundColor(AppTheme.accent)
-                .frame(width: 40, height: 40)
-                .background(AppTheme.accent.opacity(0.12))
-                .cornerRadius(AppTheme.cornerRadiusMedium)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+                    .frame(width: 34, height: 34)
+                    .background(AppTheme.accentWarm.opacity(0.5))
+                    .cornerRadius(AppTheme.cornerRadiusSmall)
 
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(AppTheme.textPrimary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textTertiary)
+                        .lineLimit(1)
+                }
+            }
 
-            Text(description)
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
+            content
         }
-        .frame(width: 160, height: 140)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(AppTheme.surface)
         .cornerRadius(AppTheme.cornerRadiusMedium)
+    }
+}
+
+struct SetupChecklist: View {
+    @ObservedObject var viewModel: TranscriptViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("启动检查")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+                Spacer()
+                if !viewModel.isWhisperModelAvailable {
+                    Button(action: viewModel.openModelDirectory) {
+                        Text("打开模型目录")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppTheme.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {
+                ForEach(viewModel.setupStatusItems) { item in
+                    SetupStatusTile(item: item)
+                }
+            }
+        }
+        .padding(16)
+        .background(AppTheme.surface)
+        .cornerRadius(AppTheme.cornerRadiusMedium)
+    }
+}
+
+struct SetupStatusTile: View {
+    let item: TranscriptViewModel.SetupStatusItem
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: item.isAvailable ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(item.isAvailable ? AppTheme.success : AppTheme.danger)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.name)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(AppTheme.textPrimary)
+                Text(item.detail)
+                    .font(.system(size: 10))
+                    .foregroundColor(AppTheme.textTertiary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 48)
+        .background(AppTheme.background)
+        .cornerRadius(AppTheme.cornerRadiusSmall)
+    }
+}
+
+struct PrimaryActionButton: View {
+    let icon: String
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(AppTheme.textPrimary)
+            .cornerRadius(AppTheme.cornerRadiusMedium)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct SecondaryActionButton: View {
+    let icon: String
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .medium))
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                Spacer()
+            }
+            .foregroundColor(AppTheme.textSecondary)
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(AppTheme.background)
+            .cornerRadius(AppTheme.cornerRadiusMedium)
+        }
+        .buttonStyle(.plain)
     }
 }
 

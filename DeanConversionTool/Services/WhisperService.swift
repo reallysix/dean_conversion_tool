@@ -7,7 +7,19 @@ class WhisperService {
 
     /// Check if whisper-cli is available
     var isModelLoaded: Bool {
-        return FileManager.default.fileExists(atPath: whisperCLIPath)
+        return isCLIAvailable
+    }
+
+    var isCLIAvailable: Bool {
+        return FileManager.default.isExecutableFile(atPath: whisperCLIPath)
+    }
+
+    var isModelAvailable: Bool {
+        return FileManager.default.fileExists(atPath: modelPath)
+    }
+
+    var modelPath: String {
+        return getModelPath()
     }
 
     /// Get the path to the whisper model

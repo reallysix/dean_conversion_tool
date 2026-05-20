@@ -175,9 +175,36 @@ enum OnlineVideoError: LocalizedError {
         case .ytDLPNotInstalled:
             return "未安装 yt-dlp。请先运行：brew install yt-dlp"
         case .downloadFailed(let message):
-            return "在线视频下载失败：\(message)"
+            return "在线视频下载失败：\(Self.userFacingDownloadMessage(from: message))"
         case .downloadedAudioMissing:
             return "在线视频下载完成，但没有找到可转写的音频文件"
         }
+    }
+
+    private static func userFacingDownloadMessage(from message: String) -> String {
+        let lowercased = message.lowercased()
+
+        if lowercased.contains("ffprobe and ffmpeg not found") || lowercased.contains("ffmpeg not found") {
+            return "缺少 FFmpeg。请先安装 ffmpeg，或重新启动应用后再试。"
+        }
+        if lowercased.contains("unsupported url") {
+            return "暂不支持这个链接，请确认它是公开视频链接。"
+        }
+        if lowercased.contains("private video") || lowercased.contains("sign in") || lowercased.contains("login") {
+            return "这个视频需要登录或权限，当前版本仅支持公开视频。"
+        }
+        if lowercased.contains("video unavailable") || lowercased.contains("not available") {
+            return "视频不可用，请确认链接可以在浏览器中正常打开。"
+        }
+        if lowercased.contains("network") || lowercased.contains("timed out") || lowercased.contains("connection") {
+            return "网络连接失败，请稍后重试。"
+        }
+
+        let lines = message
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("WARNING:") }
+
+        return lines.prefix(2).joined(separator: "\n")
     }
 }
