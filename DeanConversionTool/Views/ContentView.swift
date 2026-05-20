@@ -8,46 +8,49 @@ struct ContentView: View {
     @State private var selectedPanel: SidePanel = .transcript
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Left workspace rail
-            WorkspaceSidebar(viewModel: viewModel, selectedPanel: $selectedPanel)
+        ZStack {
+            AppTheme.background.ignoresSafeArea()
 
-            Rectangle()
-                .fill(AppTheme.border)
-                .frame(width: 1)
+            HStack(spacing: 0) {
+                WorkspaceSidebar(viewModel: viewModel, selectedPanel: $selectedPanel)
 
-            // Center + Right stacked
-            VStack(spacing: 0) {
-                HStack(spacing: 0) {
-                    // Center content - both views always present, toggle opacity
-                    ZStack {
-                        TranscriptContainerView(viewModel: viewModel)
-                            .opacity(selectedPanel == .transcript ? 1 : 0)
-                            .allowsHitTesting(selectedPanel == .transcript)
+                Rectangle()
+                    .fill(AppTheme.border)
+                    .frame(width: 1)
 
-                        EmbeddedSettingsView()
-                            .opacity(selectedPanel == .settings ? 1 : 0)
-                            .allowsHitTesting(selectedPanel == .settings)
+                VStack(spacing: 0) {
+                    HStack(spacing: 0) {
+                        ZStack {
+                            TranscriptContainerView(viewModel: viewModel)
+                                .opacity(selectedPanel == .transcript ? 1 : 0)
+                                .allowsHitTesting(selectedPanel == .transcript)
+
+                            EmbeddedSettingsView()
+                                .opacity(selectedPanel == .settings ? 1 : 0)
+                                .allowsHitTesting(selectedPanel == .settings)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+
+                        Rectangle()
+                            .fill(AppTheme.border)
+                            .frame(width: 1)
+
+                        PropertiesPanel(viewModel: viewModel)
+                            .frame(width: AppTheme.propertiesPanelWidth)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
 
                     Rectangle()
                         .fill(AppTheme.border)
-                        .frame(width: 1)
-
-                    // Right properties panel
-                    PropertiesPanel(viewModel: viewModel)
-                        .frame(width: AppTheme.propertiesPanelWidth)
+                        .frame(height: 1)
+                    BottomBar(viewModel: viewModel)
+                        .frame(height: AppTheme.bottomBarHeight)
                 }
-
-                // Bottom bar
-                Rectangle()
-                    .fill(AppTheme.border)
-                    .frame(height: 1)
-                BottomBar(viewModel: viewModel)
-                    .frame(height: AppTheme.bottomBarHeight)
             }
+            .background(AppTheme.workspace)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: .black.opacity(0.05), radius: 24, x: 0, y: 18)
+            .padding(28)
         }
         .frame(minWidth: 1100, minHeight: 680)
         .background(AppTheme.background)
@@ -149,9 +152,9 @@ struct WorkspaceHeader: View {
             }
         }
         .padding(.horizontal, 28)
-        .padding(.top, 24)
-        .padding(.bottom, 18)
-        .background(AppTheme.background)
+        .padding(.top, 26)
+        .padding(.bottom, 12)
+        .background(AppTheme.workspace)
     }
 
     private var subtitle: String {
@@ -161,7 +164,7 @@ struct WorkspaceHeader: View {
         if let transcript = viewModel.transcript {
             return "来源：\(transcript.displaySource)"
         }
-        return "导入本地文件开始转写，历史项目会自动保存到文档目录"
+        return "导入文件或粘贴链接开始转写，历史项目会自动归档"
     }
 }
 
@@ -210,70 +213,63 @@ struct WelcomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
-                HStack(alignment: .center, spacing: 22) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("转写工作台")
-                            .font(.system(size: 30, weight: .semibold))
-                            .foregroundColor(AppTheme.textPrimary)
-                        Text("导入本地文件，或粘贴在线视频链接开始转写。历史记录会自动归档。")
-                            .font(.system(size: 13))
-                            .foregroundColor(AppTheme.textSecondary)
-                    }
+            VStack(alignment: .leading, spacing: 22) {
+                HStack(alignment: .top, spacing: 26) {
+                    VStack(alignment: .leading, spacing: 20) {
+                        WorkbenchHero()
 
-                    Spacer()
+                        HStack(alignment: .top, spacing: 14) {
+                            ActionPanel(icon: "folder", title: "本地文件", subtitle: "音频、视频、批量文件") {
+                                VStack(spacing: 10) {
+                                    PrimaryActionButton(icon: "plus", title: "导入本地文件", action: openFilePicker)
+                                    SecondaryActionButton(icon: "square.stack.3d.up", title: "批量处理", action: openBatchPicker)
+                                }
+                            }
 
-                    Image(systemName: "waveform.badge.magnifyingglass")
-                        .font(.system(size: 34, weight: .medium))
-                        .foregroundColor(AppTheme.accent)
-                        .frame(width: 72, height: 72)
-                        .background(AppTheme.accentSubtle)
-                        .cornerRadius(AppTheme.cornerRadiusMedium)
-                }
+                            ActionPanel(icon: "link", title: "在线视频", subtitle: "YouTube、B 站、抖音等公开链接") {
+                                VStack(spacing: 10) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "globe")
+                                            .foregroundColor(AppTheme.textTertiary)
+                                            .frame(width: 18)
+                                        TextField("https://...", text: $viewModel.onlineVideoURL)
+                                            .textFieldStyle(.plain)
+                                            .font(.system(size: 13))
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 40)
+                                    .background(AppTheme.surfaceHover)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMedium)
+                                            .stroke(AppTheme.border)
+                                    )
+                                    .cornerRadius(AppTheme.cornerRadiusMedium)
 
-                HStack(alignment: .top, spacing: 16) {
-                    ActionPanel(icon: "folder", title: "本地文件", subtitle: "音频、视频、批量文件") {
-                        VStack(spacing: 10) {
-                            PrimaryActionButton(icon: "plus", title: "导入本地文件", action: openFilePicker)
-                            SecondaryActionButton(icon: "square.stack.3d.up", title: "批量处理", action: openBatchPicker)
+                                    PrimaryActionButton(icon: "arrow.down.circle", title: "解析并转写") {
+                                        viewModel.processOnlineVideo(urlString: viewModel.onlineVideoURL)
+                                    }
+                                    .disabled(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                    .opacity(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+                                }
+                            }
                         }
                     }
 
-                    ActionPanel(icon: "link", title: "在线视频", subtitle: "YouTube、B 站、抖音等公开视频") {
-                        VStack(spacing: 10) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "globe")
-                                    .foregroundColor(AppTheme.textTertiary)
-                                    .frame(width: 18)
-                                TextField("https://...", text: $viewModel.onlineVideoURL)
-                                    .textFieldStyle(.plain)
-                                    .font(.system(size: 13))
-                            }
-                            .padding(.horizontal, 12)
-                            .frame(height: 40)
-                            .background(AppTheme.background)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMedium)
-                                    .stroke(AppTheme.border)
-                            )
-                            .cornerRadius(AppTheme.cornerRadiusMedium)
-
-                            PrimaryActionButton(icon: "arrow.down.circle", title: "解析并转写") {
-                                viewModel.processOnlineVideo(urlString: viewModel.onlineVideoURL)
-                            }
-                            .disabled(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            .opacity(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+                    VStack(alignment: .leading, spacing: 14) {
+                        SetupChecklist(viewModel: viewModel)
+                        RecentProjectsPreview(projects: Array(viewModel.historyProjects.prefix(3))) { project in
+                            viewModel.openProject(project)
                         }
                     }
+                    .frame(width: 270)
                 }
-
-                SetupChecklist(viewModel: viewModel)
             }
-            .padding(28)
-            .frame(maxWidth: 860)
+            .padding(.horizontal, 28)
+            .padding(.top, 8)
+            .padding(.bottom, 28)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppTheme.background)
+        .background(AppTheme.workspace)
     }
 
     private func openFilePicker() {
@@ -305,6 +301,57 @@ struct WelcomeView: View {
             viewModel.batchQueue = panel.urls
             viewModel.showBatchSetup = true
         }
+    }
+}
+
+struct WorkbenchHero: View {
+    var body: some View {
+        HStack(alignment: .center, spacing: 24) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(AppTheme.accentWarm)
+                        .frame(width: 8, height: 8)
+                    Text("Ready to transcribe")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.textTertiary)
+                }
+
+                Text("把素材变成可编辑文稿")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+                    .lineLimit(1)
+
+                Text("本地视频、音频和在线视频链接都从这里开始，完成后自动进入历史归档。")
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 10)
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(AppTheme.accentLilac)
+                    .frame(width: 146, height: 118)
+                Circle()
+                    .fill(AppTheme.accentWarm)
+                    .frame(width: 16, height: 16)
+                    .offset(x: -56, y: -34)
+                Circle()
+                    .fill(AppTheme.accent)
+                    .frame(width: 13, height: 13)
+                    .offset(x: 58, y: 34)
+                Image(systemName: "waveform.and.magnifyingglass")
+                    .font(.system(size: 48, weight: .medium))
+                    .foregroundColor(AppTheme.textPrimary)
+            }
+        }
+        .padding(22)
+        .frame(minHeight: 154)
+        .background(AppTheme.surface)
+        .cornerRadius(AppTheme.cornerRadiusMedium)
     }
 }
 
@@ -407,6 +454,57 @@ struct SetupChecklist: View {
     }
 }
 
+struct RecentProjectsPreview: View {
+    let projects: [HistoryProject]
+    let onOpen: (HistoryProject) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("最近项目")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary)
+
+            if projects.isEmpty {
+                Text("完成第一条转写后，这里会显示最近处理过的项目。")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.textTertiary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach(projects) { project in
+                    Button(action: { onOpen(project) }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: project.sourceType == .onlineVideo ? "link" : "doc.text")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(AppTheme.textPrimary)
+                                .frame(width: 30, height: 30)
+                                .background(project.sourceType == .onlineVideo ? AppTheme.accentWarm.opacity(0.55) : AppTheme.accentBlue)
+                                .cornerRadius(AppTheme.cornerRadiusSmall)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(project.title)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(AppTheme.textPrimary)
+                                    .lineLimit(1)
+                                Text(project.sourceType.displayName)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(AppTheme.textTertiary)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(AppTheme.textTertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(16)
+        .background(AppTheme.surface)
+        .cornerRadius(AppTheme.cornerRadiusMedium)
+    }
+}
+
 struct SetupStatusTile: View {
     let item: TranscriptViewModel.SetupStatusItem
 
@@ -474,7 +572,7 @@ struct SecondaryActionButton: View {
             .foregroundColor(AppTheme.textSecondary)
             .padding(.horizontal, 12)
             .frame(height: 38)
-            .background(AppTheme.background)
+            .background(AppTheme.surfaceHover)
             .cornerRadius(AppTheme.cornerRadiusMedium)
         }
         .buttonStyle(.plain)

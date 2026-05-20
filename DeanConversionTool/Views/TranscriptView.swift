@@ -61,7 +61,7 @@ struct TranscriptToolbar: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(AppTheme.background)
+        .background(AppTheme.workspace)
     }
 
     private func openFilePicker() {

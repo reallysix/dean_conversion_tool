@@ -34,18 +34,22 @@ struct WorkspaceSidebar: View {
             statusSection
         }
         .frame(width: AppTheme.historySidebarWidth)
-        .background(AppTheme.surface)
+        .background(AppTheme.sidebarBackground)
     }
 
     private var brandHeader: some View {
         HStack(spacing: 10) {
-            Circle()
-                .trim(from: 0, to: 0.55)
-                .stroke(AppTheme.accentWarm, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                .frame(width: 24, height: 24)
-                .rotationEffect(.degrees(180))
+            ZStack(alignment: .bottom) {
+                Circle()
+                    .fill(AppTheme.accentWarm)
+                    .frame(width: 27, height: 27)
+                Rectangle()
+                    .fill(AppTheme.sidebarBackground)
+                    .frame(width: 31, height: 14)
+                    .offset(y: 2)
+            }
 
-            Text("Dean Tool")
+            Text("Deanly")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(AppTheme.textPrimary)
         }
@@ -226,7 +230,7 @@ private struct HistoryProjectRow: View {
             }
             .padding(.horizontal, 8)
             .frame(height: 50)
-            .background(isSelected ? AppTheme.surfaceHover : Color.clear)
+            .background(isSelected ? AppTheme.surface : Color.clear)
             .cornerRadius(AppTheme.cornerRadiusMedium)
         }
         .buttonStyle(.plain)
