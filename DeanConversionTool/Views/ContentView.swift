@@ -44,7 +44,7 @@ struct ContentView: View {
                     .frame(height: AppTheme.bottomBarHeight)
             }
         }
-        .frame(minWidth: 1100, minHeight: 680)
+        .frame(minWidth: 1280, minHeight: 760)
         .background(AppTheme.workspace)
         .ignoresSafeArea(.container, edges: .top)
         .onDrop(of: [.fileURL], isTargeted: $isDragOver) { providers in
@@ -207,54 +207,46 @@ struct WelcomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                HStack(alignment: .top, spacing: 26) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        WorkbenchHero()
+                WorkbenchHero()
 
-                        HStack(alignment: .top, spacing: 14) {
-                            ActionPanel(icon: "folder", title: "本地文件", subtitle: "音频、视频、批量文件") {
-                                VStack(spacing: 10) {
-                                    PrimaryActionButton(icon: "plus", title: "导入本地文件", action: openFilePicker)
-                                    SecondaryActionButton(icon: "square.stack.3d.up", title: "批量处理", action: openBatchPicker)
-                                }
-                            }
-
-                            ActionPanel(icon: "link", title: "在线视频", subtitle: "YouTube、B 站、抖音等公开链接") {
-                                VStack(spacing: 10) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "globe")
-                                            .foregroundColor(AppTheme.textTertiary)
-                                            .frame(width: 18)
-                                        TextField("https://...", text: $viewModel.onlineVideoURL)
-                                            .textFieldStyle(.plain)
-                                            .font(.system(size: 13))
-                                    }
-                                    .padding(.horizontal, 12)
-                                    .frame(height: 40)
-                                    .background(AppTheme.surfaceHover)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMedium)
-                                            .stroke(AppTheme.border)
-                                    )
-                                    .cornerRadius(AppTheme.cornerRadiusMedium)
-
-                                    PrimaryActionButton(icon: "arrow.down.circle", title: "解析并转写") {
-                                        viewModel.processOnlineVideo(urlString: viewModel.onlineVideoURL)
-                                    }
-                                    .disabled(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                                    .opacity(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
-                                }
-                            }
+                HStack(alignment: .top, spacing: 14) {
+                    ActionPanel(icon: "folder", title: "本地文件", subtitle: "音频、视频、批量文件") {
+                        VStack(spacing: 10) {
+                            PrimaryActionButton(icon: "plus", title: "导入本地文件", action: openFilePicker)
+                            SecondaryActionButton(icon: "square.stack.3d.up", title: "批量处理", action: openBatchPicker)
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 14) {
-                        SetupChecklist(viewModel: viewModel)
-                        RecentProjectsPreview(projects: Array(viewModel.historyProjects.prefix(3))) { project in
-                            viewModel.openProject(project)
+                    ActionPanel(icon: "link", title: "在线视频", subtitle: "YouTube、B 站、抖音等公开链接") {
+                        VStack(spacing: 10) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "globe")
+                                    .foregroundColor(AppTheme.textTertiary)
+                                    .frame(width: 18)
+                                TextField("https://...", text: $viewModel.onlineVideoURL)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 13))
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(height: 40)
+                            .background(AppTheme.surfaceHover)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMedium)
+                                    .stroke(AppTheme.border)
+                            )
+                            .cornerRadius(AppTheme.cornerRadiusMedium)
+
+                            PrimaryActionButton(icon: "arrow.down.circle", title: "解析并转写") {
+                                viewModel.processOnlineVideo(urlString: viewModel.onlineVideoURL)
+                            }
+                            .disabled(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .opacity(viewModel.onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
                         }
                     }
-                    .frame(width: 270)
+                }
+
+                RecentProjectsPreview(projects: Array(viewModel.historyProjects.prefix(3))) { project in
+                    viewModel.openProject(project)
                 }
             }
             .padding(.horizontal, 28)
@@ -384,69 +376,6 @@ struct ActionPanel<Content: View>: View {
     }
 }
 
-struct SetupChecklist: View {
-    @ObservedObject var viewModel: TranscriptViewModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("启动检查")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.textPrimary)
-                Spacer()
-                if !viewModel.isWhisperModelAvailable {
-                    HStack(spacing: 12) {
-                        Button(action: viewModel.openModelDirectory) {
-                            Text("打开模型目录")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(AppTheme.accent)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button(action: viewModel.downloadWhisperModel) {
-                            Text(viewModel.isDownloadingModel ? "下载中" : "下载模型")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(AppTheme.textPrimary)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(viewModel.isDownloadingModel)
-                    }
-                }
-            }
-
-            if viewModel.isDownloadingModel {
-                HStack(spacing: 10) {
-                    ProgressView(value: viewModel.modelDownloadProgress)
-                        .progressViewStyle(.linear)
-                    Text("\(Int(viewModel.modelDownloadProgress * 100))%")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppTheme.textSecondary)
-                        .frame(width: 34, alignment: .trailing)
-                    Button(action: viewModel.cancelModelDownload) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(AppTheme.textSecondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            } else if !viewModel.modelDownloadMessage.isEmpty {
-                Text(viewModel.modelDownloadMessage)
-                    .font(.system(size: 11))
-                    .foregroundColor(viewModel.isWhisperModelAvailable ? AppTheme.success : AppTheme.textTertiary)
-            }
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {
-                ForEach(viewModel.setupStatusItems) { item in
-                    SetupStatusTile(item: item)
-                }
-            }
-        }
-        .padding(16)
-        .background(AppTheme.surface)
-        .cornerRadius(AppTheme.cornerRadiusMedium)
-    }
-}
-
 struct RecentProjectsPreview: View {
     let projects: [HistoryProject]
     let onOpen: (HistoryProject) -> Void
@@ -495,32 +424,6 @@ struct RecentProjectsPreview: View {
         .padding(16)
         .background(AppTheme.surface)
         .cornerRadius(AppTheme.cornerRadiusMedium)
-    }
-}
-
-struct SetupStatusTile: View {
-    let item: TranscriptViewModel.SetupStatusItem
-
-    var body: some View {
-        HStack(spacing: 9) {
-            Image(systemName: item.isAvailable ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(item.isAvailable ? AppTheme.success : AppTheme.danger)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.name)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(AppTheme.textPrimary)
-                Text(item.detail)
-                    .font(.system(size: 10))
-                    .foregroundColor(AppTheme.textTertiary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 48)
-        .background(AppTheme.background)
-        .cornerRadius(AppTheme.cornerRadiusSmall)
     }
 }
 

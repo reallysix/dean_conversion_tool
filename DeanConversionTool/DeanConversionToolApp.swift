@@ -10,6 +10,7 @@ struct DeanConversionToolApp: App {
                 .background(WindowConfigurator())
         }
         .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1440, height: 860)
         .commands {
             // Add custom menu commands
             CommandGroup(after: .newItem) {
@@ -38,6 +39,7 @@ private struct WindowConfigurator: NSViewRepresentable {
             window.styleMask.insert(.fullSizeContentView)
             window.isMovableByWindowBackground = true
             window.backgroundColor = .clear
+            window.minSize = NSSize(width: 1280, height: 760)
         }
         return view
     }

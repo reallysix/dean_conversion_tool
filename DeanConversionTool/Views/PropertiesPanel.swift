@@ -107,11 +107,88 @@ struct EmptyPropertiesPanel: View {
                 Text("环境")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.textPrimary)
-                MiniStatus(label: "Whisper", available: viewModel.isWhisperCLIAvailable)
-                MiniStatus(label: "模型", available: viewModel.isWhisperModelAvailable)
-                MiniStatus(label: "FFmpeg", available: viewModel.isFFmpegAvailable)
-                MiniStatus(label: "yt-dlp", available: viewModel.isYTDLPAvailable)
+                EnvironmentStatusPanel(viewModel: viewModel)
             }
+        }
+    }
+}
+
+struct EnvironmentStatusPanel: View {
+    @ObservedObject var viewModel: TranscriptViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ForEach(viewModel.setupStatusItems) { item in
+                EnvironmentStatusRow(item: item)
+            }
+
+            if viewModel.isDownloadingModel {
+                HStack(spacing: 10) {
+                    ProgressView(value: viewModel.modelDownloadProgress)
+                        .progressViewStyle(.linear)
+                    Text("\(Int(viewModel.modelDownloadProgress * 100))%")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(AppTheme.textSecondary)
+                        .frame(width: 34, alignment: .trailing)
+                    Button(action: viewModel.cancelModelDownload) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 4)
+            } else if !viewModel.isWhisperModelAvailable {
+                HStack(spacing: 10) {
+                    Button(action: viewModel.downloadWhisperModel) {
+                        Text("下载模型")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: viewModel.openModelDirectory) {
+                        Text("打开目录")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppTheme.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 4)
+            } else if !viewModel.modelDownloadMessage.isEmpty {
+                Text(viewModel.modelDownloadMessage)
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.success)
+                    .padding(.top, 2)
+            }
+        }
+    }
+}
+
+struct EnvironmentStatusRow: View {
+    let item: TranscriptViewModel.SetupStatusItem
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(item.isAvailable ? AppTheme.success : AppTheme.danger)
+                .frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.name)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary)
+                    .lineLimit(1)
+                if !item.isAvailable {
+                    Text(item.detail)
+                        .font(.system(size: 10))
+                        .foregroundColor(AppTheme.textTertiary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 4)
+            Text(item.isAvailable ? "就绪" : "缺失")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(item.isAvailable ? AppTheme.success : AppTheme.danger)
         }
     }
 }
@@ -143,26 +220,6 @@ struct StatusBubble: View {
         .padding(12)
         .background(AppTheme.surfaceHover)
         .cornerRadius(AppTheme.cornerRadiusMedium)
-    }
-}
-
-struct MiniStatus: View {
-    let label: String
-    let available: Bool
-
-    var body: some View {
-        HStack {
-            Circle()
-                .fill(available ? AppTheme.success : AppTheme.danger)
-                .frame(width: 7, height: 7)
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.textSecondary)
-            Spacer()
-            Text(available ? "就绪" : "缺失")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(available ? AppTheme.success : AppTheme.danger)
-        }
     }
 }
 
