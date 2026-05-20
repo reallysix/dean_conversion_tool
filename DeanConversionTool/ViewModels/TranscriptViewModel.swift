@@ -44,6 +44,9 @@ class TranscriptViewModel: ObservableObject {
     @Published var historyProjects: [HistoryProject] = []
     @Published var selectedProjectID: UUID?
     @Published var onlineVideoURL = ""
+    @Published var isDownloadingModel = false
+    @Published var modelDownloadProgress = 0.0
+    @Published var modelDownloadMessage = ""
 
     // Selection is managed separately to avoid re-renders
     let selectionManager = SelectionManager()
@@ -88,6 +91,7 @@ class TranscriptViewModel: ObservableObject {
     private let exportService = ExportService()
     private let historyStore = HistoryProjectStore()
     private let onlineVideoService = OnlineVideoService()
+    private let modelDownloadService = ModelDownloadService()
 
     // MARK: - State
     private var tempWavPath: String?
@@ -457,9 +461,47 @@ class TranscriptViewModel: ObservableObject {
     }
 
     func openModelDownloadPage() {
-        if let url = URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin") {
-            NSWorkspace.shared.open(url)
+        NSWorkspace.shared.open(modelDownloadService.downloadPageURL)
+    }
+
+    func downloadWhisperModel() {
+        guard !isDownloadingModel else { return }
+
+        let destinationURL = URL(fileURLWithPath: whisperModelPath)
+        isDownloadingModel = true
+        modelDownloadProgress = 0
+        modelDownloadMessage = "正在连接模型下载源..."
+        error = nil
+
+        modelDownloadService.downloadModel(to: destinationURL) { [weak self] progress in
+            guard let self else { return }
+            self.modelDownloadProgress = progress
+            self.modelDownloadMessage = "正在下载模型 \(Int(progress * 100))%"
+        } onComplete: { [weak self] result in
+            guard let self else { return }
+            self.isDownloadingModel = false
+
+            switch result {
+            case .success:
+                self.modelDownloadProgress = 1
+                self.modelDownloadMessage = "模型已就绪"
+                self.objectWillChange.send()
+            case .failure(let downloadError):
+                if (downloadError as NSError).code == NSURLErrorCancelled {
+                    self.modelDownloadMessage = "模型下载已取消"
+                } else {
+                    self.modelDownloadMessage = "模型下载失败"
+                    self.error = "模型下载失败：\(downloadError.localizedDescription)"
+                }
+            }
         }
+    }
+
+    func cancelModelDownload() {
+        guard isDownloadingModel else { return }
+        modelDownloadService.cancel()
+        isDownloadingModel = false
+        modelDownloadMessage = "模型下载已取消"
     }
 
     private func cleanupTempFiles() {

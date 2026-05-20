@@ -39,6 +39,8 @@ The pipeline test depends on local tools and models:
 - `~/Library/Application Support/DeanConversion/models/ggml-large-v3.bin`
 - Python 3 with `pyannote.audio` for speaker diarization checks
 
+The app can download the Whisper model from the launch setup checklist. Keep model downloads in the default Application Support path unless the product decision changes.
+
 Use this command before packaging or release checks:
 
 ```bash

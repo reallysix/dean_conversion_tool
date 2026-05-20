@@ -355,13 +355,44 @@ struct SetupChecklist: View {
                     .foregroundColor(AppTheme.textPrimary)
                 Spacer()
                 if !viewModel.isWhisperModelAvailable {
-                    Button(action: viewModel.openModelDirectory) {
-                        Text("打开模型目录")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(AppTheme.accent)
+                    HStack(spacing: 12) {
+                        Button(action: viewModel.openModelDirectory) {
+                            Text("打开模型目录")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppTheme.accent)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: viewModel.downloadWhisperModel) {
+                            Text(viewModel.isDownloadingModel ? "下载中" : "下载模型")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppTheme.textPrimary)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(viewModel.isDownloadingModel)
+                    }
+                }
+            }
+
+            if viewModel.isDownloadingModel {
+                HStack(spacing: 10) {
+                    ProgressView(value: viewModel.modelDownloadProgress)
+                        .progressViewStyle(.linear)
+                    Text("\(Int(viewModel.modelDownloadProgress * 100))%")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppTheme.textSecondary)
+                        .frame(width: 34, alignment: .trailing)
+                    Button(action: viewModel.cancelModelDownload) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(AppTheme.textSecondary)
                     }
                     .buttonStyle(.plain)
                 }
+            } else if !viewModel.modelDownloadMessage.isEmpty {
+                Text(viewModel.modelDownloadMessage)
+                    .font(.system(size: 11))
+                    .foregroundColor(viewModel.isWhisperModelAvailable ? AppTheme.success : AppTheme.textTertiary)
             }
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {

@@ -54,11 +54,13 @@ Scripts/check_dependencies.sh --install
 
 ## 下载 Whisper 模型
 
+应用首页的「启动检查」会在模型缺失时显示「下载模型」，可直接在应用内下载到默认目录。
+
 ```bash
 ./download_model.sh
 ```
 
-脚本会将 large-v3 模型下载到：
+应用内下载和脚本都会将 large-v3 模型保存到：
 
 ```text
 ~/Library/Application Support/DeanConversion/models/
