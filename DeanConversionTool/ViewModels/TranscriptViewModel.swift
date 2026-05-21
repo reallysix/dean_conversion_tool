@@ -81,6 +81,11 @@ class TranscriptViewModel: ObservableObject {
     @Published var player: AVPlayer?
     @Published var isVideoFile = false
 
+    var selectedHistoryProject: HistoryProject? {
+        guard let selectedProjectID else { return nil }
+        return historyProjects.first { $0.id == selectedProjectID }
+    }
+
     // Batch processing
     @Published var isBatchMode = false
     @Published var batchQueue: [URL] = []
@@ -619,6 +624,11 @@ class TranscriptViewModel: ObservableObject {
         } catch {
             self.error = "打开历史项目失败：\(error.localizedDescription)"
         }
+    }
+
+    func revealSelectedHistoryProject() {
+        guard let project = selectedHistoryProject else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([project.projectURL])
     }
 
     func loadOnlinePreview(for sourceURL: URL) {
