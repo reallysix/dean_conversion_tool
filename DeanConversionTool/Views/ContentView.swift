@@ -101,8 +101,14 @@ struct TranscriptContainerView: View {
             WorkspaceHeader(viewModel: viewModel)
             TranscriptToolbar(viewModel: viewModel)
 
-            if let transcript = viewModel.transcript {
-                TranscriptView(viewModel: viewModel, selectionManager: viewModel.selectionManager, transcript: transcript)
+            if viewModel.isLoading, viewModel.transcript == nil {
+                ProcessingStateView(message: viewModel.loadingMessage, progress: viewModel.progress)
+            } else if let transcript = viewModel.transcript {
+                if viewModel.filteredSegments.isEmpty {
+                    TranscriptEmptyStateView(searchText: viewModel.searchText)
+                } else {
+                    TranscriptView(viewModel: viewModel, selectionManager: viewModel.selectionManager, transcript: transcript)
+                }
             } else if !viewModel.isLoading {
                 WelcomeView(viewModel: viewModel)
             }
@@ -240,51 +246,13 @@ struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 22) {
                 WorkbenchHero()
 
-                HStack(alignment: .top, spacing: 14) {
-                    ActionPanel(icon: "folder", title: "本地文件", subtitle: "音频、视频、批量文件") {
-                        VStack(spacing: 10) {
-                            PrimaryActionButton(icon: "plus", title: "导入本地文件", action: openFilePicker)
-                            SecondaryActionButton(icon: "square.stack.3d.up", title: "批量处理", action: openBatchPicker)
-                        }
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 14) {
+                        actionPanels
                     }
 
-                    ActionPanel(icon: "link", title: "在线视频", subtitle: "YouTube、B 站、抖音等公开链接") {
-                        VStack(spacing: 10) {
-                            let inputState = viewModel.onlineVideoInputState
-                            HStack(spacing: 8) {
-                                Image(systemName: "globe")
-                                    .foregroundColor(AppTheme.textTertiary)
-                                    .frame(width: 18)
-                                TextField("https://...", text: $viewModel.onlineVideoURL)
-                                    .textFieldStyle(.plain)
-                                    .font(.system(size: 13))
-                            }
-                            .padding(.horizontal, 12)
-                            .frame(height: 40)
-                            .background(AppTheme.surfaceHover)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMedium)
-                                    .stroke(AppTheme.border)
-                            )
-                            .cornerRadius(AppTheme.cornerRadiusMedium)
-
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(inputState.isReady ? AppTheme.success : AppTheme.textTertiary.opacity(0.6))
-                                    .frame(width: 6, height: 6)
-                                Text(inputState.message)
-                                    .font(.system(size: 10))
-                                    .foregroundColor(inputState.isReady ? AppTheme.success : AppTheme.textTertiary)
-                                    .lineLimit(1)
-                                Spacer(minLength: 0)
-                            }
-
-                            PrimaryActionButton(icon: "arrow.down.circle", title: "解析并转写") {
-                                viewModel.processOnlineVideo(urlString: inputState.normalizedURLString ?? viewModel.onlineVideoURL)
-                            }
-                            .disabled(!inputState.isReady)
-                            .opacity(inputState.isReady ? 1 : 0.45)
-                        }
+                    VStack(alignment: .leading, spacing: 14) {
+                        actionPanels
                     }
                 }
 
@@ -298,6 +266,55 @@ struct WelcomeView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppTheme.workspace)
+    }
+
+    @ViewBuilder
+    private var actionPanels: some View {
+        ActionPanel(icon: "folder", title: "本地文件", subtitle: "音频、视频、批量文件") {
+            VStack(spacing: 10) {
+                PrimaryActionButton(icon: "plus", title: "导入本地文件", action: openFilePicker)
+                SecondaryActionButton(icon: "square.stack.3d.up", title: "批量处理", action: openBatchPicker)
+            }
+        }
+
+        ActionPanel(icon: "link", title: "在线视频", subtitle: "YouTube、B 站、抖音等公开链接") {
+            VStack(spacing: 10) {
+                let inputState = viewModel.onlineVideoInputState
+                HStack(spacing: 8) {
+                    Image(systemName: "globe")
+                        .foregroundColor(AppTheme.textTertiary)
+                        .frame(width: 18)
+                    TextField("https://...", text: $viewModel.onlineVideoURL)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 40)
+                .background(AppTheme.surfaceHover)
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMedium)
+                        .stroke(AppTheme.border)
+                )
+                .cornerRadius(AppTheme.cornerRadiusMedium)
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(inputState.isReady ? AppTheme.success : AppTheme.textTertiary.opacity(0.6))
+                        .frame(width: 6, height: 6)
+                    Text(inputState.message)
+                        .font(.system(size: 10))
+                        .foregroundColor(inputState.isReady ? AppTheme.success : AppTheme.textTertiary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+
+                PrimaryActionButton(icon: "arrow.down.circle", title: "解析并转写") {
+                    viewModel.processOnlineVideo(urlString: inputState.normalizedURLString ?? viewModel.onlineVideoURL)
+                }
+                .disabled(!inputState.isReady)
+                .opacity(inputState.isReady ? 1 : 0.45)
+            }
+        }
     }
 
     private func openFilePicker() {
@@ -329,6 +346,65 @@ struct WelcomeView: View {
             viewModel.batchQueue = panel.urls
             viewModel.showBatchSetup = true
         }
+    }
+}
+
+struct ProcessingStateView: View {
+    let message: String
+    let progress: Double
+
+    var body: some View {
+        VStack(spacing: 18) {
+            ZStack {
+                Circle()
+                    .stroke(AppTheme.surfaceHover, lineWidth: 10)
+                    .frame(width: 118, height: 118)
+                Circle()
+                    .trim(from: 0, to: max(0.02, min(progress, 1)))
+                    .stroke(AppTheme.accent, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: 118, height: 118)
+                Text("\(Int(progress * 100))%")
+                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                    .foregroundColor(AppTheme.textPrimary)
+            }
+
+            VStack(spacing: 6) {
+                Text(message.isEmpty ? "正在处理素材" : message)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+                    .multilineTextAlignment(.center)
+                Text("完成后会自动保存到历史记录。")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.textTertiary)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.workspace)
+    }
+}
+
+struct TranscriptEmptyStateView: View {
+    let searchText: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 34, weight: .medium))
+                .foregroundColor(AppTheme.textTertiary)
+                .frame(width: 74, height: 74)
+                .background(AppTheme.surface)
+                .cornerRadius(AppTheme.cornerRadiusMedium)
+
+            Text(searchText.isEmpty ? "暂无可显示片段" : "没有匹配的文稿片段")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary)
+            Text(searchText.isEmpty ? "转写完成后，片段会显示在这里。" : "换个关键词再试试。")
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.textTertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.workspace)
     }
 }
 

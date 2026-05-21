@@ -7,12 +7,14 @@ struct PropertiesPanel: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text(viewModel.transcript == nil ? "任务状态" : "文稿详情")
+                Text("任务状态")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(AppTheme.textPrimary)
                     .padding(.top, 24)
 
                 if let transcript = viewModel.transcript {
+                    TaskStatusSummaryView(viewModel: viewModel, transcript: transcript)
+
                     PropertiesSection(title: "文件") {
                         PropertyRow(label: "名称", value: transcript.displayTitle)
                         PropertyRow(label: "来源", value: transcript.sourceURL.isFileURL ? "本地文件" : "在线视频")
@@ -54,6 +56,10 @@ struct PropertiesPanel: View {
                                 revealAction: viewModel.revealLastExportedFile
                             )
                         }
+                    }
+
+                    PropertiesSection(title: "环境") {
+                        EnvironmentStatusPanel(viewModel: viewModel, compact: true)
                     }
                 } else {
                     EmptyPropertiesPanel(viewModel: viewModel)
@@ -103,19 +109,59 @@ struct EmptyPropertiesPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            StatusBubble(icon: "folder", title: "本地导入", message: "选择音频或视频文件后自动转写。")
-            StatusBubble(icon: "link", title: "在线链接", message: "粘贴公开视频链接后会先解析音频。")
-            StatusBubble(icon: "archivebox", title: "历史归档", message: "结果会按视频标题保存，方便回看。")
+            PropertiesSection(title: "开始") {
+                StatusBubble(icon: "folder", title: "本地导入", message: "选择音频或视频文件后自动转写。")
+                StatusBubble(icon: "link", title: "在线链接", message: "粘贴公开视频链接后会先解析音频。")
+                StatusBubble(icon: "archivebox", title: "历史归档", message: "结果会按视频标题保存，方便回看。")
+            }
 
-            Divider()
-                .background(AppTheme.border)
-                .padding(.vertical, 2)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("环境")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppTheme.textPrimary)
+            PropertiesSection(title: "环境") {
                 EnvironmentStatusPanel(viewModel: viewModel)
+            }
+        }
+    }
+}
+
+struct TaskStatusSummaryView: View {
+    @ObservedObject var viewModel: TranscriptViewModel
+    let transcript: Transcript
+
+    var body: some View {
+        PropertiesSection(title: "当前") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Image(systemName: transcript.sourceURL.isFileURL ? "doc.text" : "link")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary)
+                        .frame(width: 34, height: 34)
+                        .background(transcript.sourceURL.isFileURL ? AppTheme.accentBlue : AppTheme.accentWarm.opacity(0.45))
+                        .cornerRadius(AppTheme.cornerRadiusSmall)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(viewModel.isLoading ? "正在处理" : "已完成")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(viewModel.isLoading ? AppTheme.accent : AppTheme.success)
+                        Text(transcript.sourceURL.isFileURL ? "本地文件转写" : "在线视频转写")
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.textTertiary)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                if viewModel.isLoading {
+                    ProgressView(value: viewModel.progress)
+                        .progressViewStyle(.linear)
+                        .tint(AppTheme.accent)
+                    Text(viewModel.loadingMessage)
+                        .font(.system(size: 10))
+                        .foregroundColor(AppTheme.textTertiary)
+                        .lineLimit(2)
+                } else {
+                    Text("文稿、字幕和文本文件已进入历史归档。")
+                        .font(.system(size: 10))
+                        .foregroundColor(AppTheme.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -123,13 +169,16 @@ struct EmptyPropertiesPanel: View {
 
 struct EnvironmentStatusPanel: View {
     @ObservedObject var viewModel: TranscriptViewModel
+    var compact = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            EnvironmentSummary(
-                missingRequired: viewModel.requiredSetupMissingCount,
-                missingOptional: viewModel.optionalSetupMissingCount
-            )
+            if !compact {
+                EnvironmentSummary(
+                    missingRequired: viewModel.requiredSetupMissingCount,
+                    missingOptional: viewModel.optionalSetupMissingCount
+                )
+            }
 
             ForEach(viewModel.setupStatusItems) { item in
                 EnvironmentStatusRow(
@@ -137,6 +186,12 @@ struct EnvironmentStatusPanel: View {
                     isInstalling: viewModel.isInstallingDependencies,
                     installAction: viewModel.installMissingDependencies
                 )
+            }
+
+            if compact, viewModel.requiredSetupMissingCount == 0, viewModel.optionalSetupMissingCount == 0 {
+                Text("核心环境已就绪")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(AppTheme.success)
             }
 
             if viewModel.isDownloadingModel {
@@ -384,9 +439,7 @@ struct StatusBubble: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(12)
-        .background(AppTheme.surfaceHover)
-        .cornerRadius(AppTheme.cornerRadiusMedium)
+        .padding(.vertical, 4)
     }
 }
 
