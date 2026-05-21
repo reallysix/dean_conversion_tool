@@ -36,8 +36,8 @@
 - [x] 对 `deno` 缺失提供 YouTube 解析相关提示。
 - [x] 明确是否允许 App 调用 Homebrew 自动安装依赖。
 - [x] 打包流程接入 `Scripts/check_dependencies.sh` 依赖检查。
-- [ ] 设计用户确认后的依赖安装入口，必要时再调用 `Scripts/check_dependencies.sh --install`。
-- [ ] 右侧环境列表发现缺失依赖时，提供“点击安装”入口。
+- [x] 设计用户确认后的依赖安装入口，必要时再调用 `Scripts/check_dependencies.sh --install`。
+- [x] 右侧环境列表发现缺失依赖时，提供“点击安装”入口。
 
 ## 模型下载与分发
 

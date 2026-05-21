@@ -132,9 +132,11 @@ struct EnvironmentStatusPanel: View {
             )
 
             ForEach(viewModel.setupStatusItems) { item in
-                EnvironmentStatusRow(item: item) { command in
-                    viewModel.copyInstallCommand(command)
-                }
+                EnvironmentStatusRow(
+                    item: item,
+                    isInstalling: viewModel.isInstallingDependencies,
+                    installAction: viewModel.installMissingDependencies
+                )
             }
 
             if viewModel.isDownloadingModel {
@@ -160,6 +162,14 @@ struct EnvironmentStatusPanel: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 2)
+            }
+
+            if let message = viewModel.dependencyInstallMessage {
+                Text(message)
+                    .font(.system(size: 10))
+                    .foregroundColor(viewModel.dependencyInstallIsError ? AppTheme.danger : AppTheme.success)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(3)
             }
 
             if let message = viewModel.setupClipboardMessage {
@@ -288,7 +298,8 @@ struct EnvironmentSummary: View {
 
 struct EnvironmentStatusRow: View {
     let item: TranscriptViewModel.SetupStatusItem
-    let copyAction: (String) -> Void
+    let isInstalling: Bool
+    let installAction: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -312,17 +323,19 @@ struct EnvironmentStatusRow: View {
                     .lineLimit(2)
 
                 if !item.isAvailable, let command = item.installCommand {
-                    Button(action: { copyAction(command) }) {
+                    Button(action: installAction) {
                         HStack(spacing: 4) {
-                            Image(systemName: "doc.on.doc")
+                            Image(systemName: isInstalling ? "hourglass" : "arrow.down.circle")
                                 .font(.system(size: 9, weight: .semibold))
-                            Text(command)
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            Text(isInstalling ? "安装中..." : "点击安装")
+                                .font(.system(size: 10, weight: .semibold))
                                 .lineLimit(1)
                         }
                         .foregroundColor(AppTheme.accent)
                     }
                     .buttonStyle(.plain)
+                    .disabled(isInstalling)
+                    .help(command)
                 }
             }
             Spacer(minLength: 4)

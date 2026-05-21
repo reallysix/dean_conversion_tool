@@ -31,6 +31,18 @@ class SelectionManager: ObservableObject {
     }
 }
 
+enum DependencyInstallError: LocalizedError {
+    case commandFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .commandFailed(let output):
+            let trimmedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmedOutput.isEmpty ? "安装命令执行失败。" : trimmedOutput
+        }
+    }
+}
+
 /// Main ViewModel coordinating the full transcription pipeline
 @MainActor
 class TranscriptViewModel: ObservableObject {
@@ -53,6 +65,9 @@ class TranscriptViewModel: ObservableObject {
     @Published var exportStatusIsError = false
     @Published var lastExportedFileURL: URL?
     @Published var setupClipboardMessage: String?
+    @Published var dependencyInstallMessage: String?
+    @Published var dependencyInstallIsError = false
+    @Published var isInstallingDependencies = false
     @Published var lastFailedOnlineVideoURLString: String?
     @Published var playbackSeekTime: TimeInterval?
     @Published var playbackSeekRequestID = UUID()
@@ -691,6 +706,103 @@ class TranscriptViewModel: ObservableObject {
 
     func copyDependencyCheckCommand() {
         copyInstallCommand("Scripts/check_dependencies.sh --install")
+    }
+
+    func installMissingDependencies() {
+        guard !isInstallingDependencies else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "安装缺失依赖？"
+        alert.informativeText = "将调用 Homebrew 安装当前缺失的命令行工具。安装过程可能需要几分钟，期间请不要关闭应用。"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "安装")
+        alert.addButton(withTitle: "取消")
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard let scriptURL = dependencyInstallScriptURL() else {
+            dependencyInstallMessage = "没有找到依赖安装脚本。"
+            dependencyInstallIsError = true
+            return
+        }
+
+        isInstallingDependencies = true
+        dependencyInstallMessage = "正在安装缺失依赖..."
+        dependencyInstallIsError = false
+        setupClipboardMessage = nil
+        error = nil
+
+        Task {
+            do {
+                let output = try await runDependencyInstaller(scriptURL: scriptURL)
+                dependencyInstallMessage = summarizeDependencyInstallOutput(output)
+                dependencyInstallIsError = false
+                objectWillChange.send()
+            } catch {
+                dependencyInstallMessage = "依赖安装失败：\(error.localizedDescription)"
+                dependencyInstallIsError = true
+            }
+
+            isInstallingDependencies = false
+        }
+    }
+
+    private func dependencyInstallScriptURL() -> URL? {
+        if let bundledScriptURL = Bundle.main.url(forResource: "check_dependencies", withExtension: "sh") {
+            return bundledScriptURL
+        }
+
+        let localScriptURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("Scripts/check_dependencies.sh")
+        if FileManager.default.fileExists(atPath: localScriptURL.path) {
+            return localScriptURL
+        }
+
+        return nil
+    }
+
+    private func runDependencyInstaller(scriptURL: URL) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/bin/bash")
+                process.arguments = [scriptURL.path, "--install"]
+
+                var environment = ProcessInfo.processInfo.environment
+                let fallbackPath = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+                if let path = environment["PATH"], !path.isEmpty {
+                    environment["PATH"] = "\(fallbackPath):\(path)"
+                } else {
+                    environment["PATH"] = fallbackPath
+                }
+                process.environment = environment
+
+                let outputPipe = Pipe()
+                process.standardOutput = outputPipe
+                process.standardError = outputPipe
+
+                do {
+                    try process.run()
+                    let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
+
+                    let output = String(data: outputData, encoding: .utf8) ?? ""
+                    guard process.terminationStatus == 0 else {
+                        throw DependencyInstallError.commandFailed(output)
+                    }
+
+                    continuation.resume(returning: output)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func summarizeDependencyInstallOutput(_ output: String) -> String {
+        if output.localizedCaseInsensitiveContains("All required command-line tools are installed") {
+            return "核心依赖已经就绪。"
+        }
+        return "依赖安装完成，环境状态已刷新。"
     }
 
     func openModelDirectory() {

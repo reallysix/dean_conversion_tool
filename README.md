@@ -12,7 +12,7 @@ Dean Conversion Tool 是一款 macOS 原生音视频转文字工具。它基于 
 - 批量处理：支持多文件批量转写并自动导出。
 - 在线视频：支持粘贴 `yt-dlp` 可解析的公开视频链接，输入时显示平台识别状态，失败后可直接重试。
 - 历史记录：按视频标题归档转写结果、字幕和文本文件，并保存在线视频的标题、原始链接、平台和创建时间。
-- 环境检查：右侧任务状态会统一显示 Whisper、模型、FFmpeg、`yt-dlp`、`deno` 和可选说话人识别状态。
+- 环境检查：右侧任务状态会统一显示 Whisper、模型、FFmpeg、`yt-dlp`、`deno` 和可选说话人识别状态，缺失命令行依赖时可确认后一键安装。
 - 模型下载：模型缺失时可在应用内下载，并显示模型大小、保存位置、下载进度、取消、失败重试和下载源入口。
 - 视频预览：本地视频文件可在应用内播放；在线视频文稿会显示原始链接的内嵌预览，YouTube 预览支持点击文稿片段跳转。
 - 多格式导出：支持 SRT、TXT、Markdown、HTML、JSON。
@@ -44,13 +44,13 @@ pip3 install --break-system-packages pyannote.audio torch torchaudio
 Scripts/check_dependencies.sh
 ```
 
-如果用户明确希望通过 Homebrew 安装缺失工具，可以手动运行：
+如果用户明确希望通过 Homebrew 安装缺失工具，可以在 App 右侧「环境」区域点击缺失项的「点击安装」，或手动运行：
 
 ```bash
 Scripts/check_dependencies.sh --install
 ```
 
-当前策略是：App 不会在首次启动时静默调用 Homebrew 自动安装依赖。应用会在右侧“环境”区域检测缺失项，并提供可复制的安装命令；打包脚本会默认运行 `Scripts/check_dependencies.sh` 做本机依赖检查。
+当前策略是：App 不会在首次启动时静默调用 Homebrew 自动安装依赖。应用会在右侧“环境”区域检测缺失项，只有用户确认后才会调用 `Scripts/check_dependencies.sh --install`；打包脚本会默认运行 `Scripts/check_dependencies.sh` 做本机依赖检查。
 
 说话人识别依赖 Hugging Face 模型授权。首次使用前可能需要登录 Hugging Face 并接受 pyannote 模型许可。
 

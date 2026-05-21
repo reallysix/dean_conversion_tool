@@ -32,6 +32,16 @@ targets:
           set -euo pipefail
           mkdir -p "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
           cp "$SRCROOT/PythonHelpers/speaker_diarization.py" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/"
+      - name: Copy dependency installer
+        inputFiles:
+          - "$(SRCROOT)/Scripts/check_dependencies.sh"
+        outputFiles:
+          - "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/check_dependencies.sh"
+        script: |
+          set -euo pipefail
+          mkdir -p "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          cp "$SRCROOT/Scripts/check_dependencies.sh" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/check_dependencies.sh"
+          chmod +x "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/check_dependencies.sh"
     settings:
       base:
         PRODUCT_NAME: Dean Conversion Tool
