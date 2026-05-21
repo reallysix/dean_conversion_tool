@@ -161,30 +161,49 @@ struct WorkspaceHeader: View {
     @ObservedObject var viewModel: TranscriptViewModel
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(viewModel.transcript?.displayTitle ?? "转写工作台")
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundColor(AppTheme.textPrimary)
-                    .lineLimit(1)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                titleBlock
 
-                Text(subtitle)
-                    .font(.system(size: 13))
-                    .foregroundColor(AppTheme.textTertiary)
+                Spacer(minLength: 16)
+
+                metrics
             }
 
-            Spacer()
-
-            HStack(spacing: 8) {
-                HeaderMetric(title: "历史", value: "\(viewModel.historyProjects.count)")
-                HeaderMetric(title: "片段", value: "\(viewModel.transcript?.segments.count ?? 0)")
-                HeaderMetric(title: "说话人", value: "\(viewModel.transcript?.speakerCount ?? 0)")
+            VStack(alignment: .leading, spacing: 12) {
+                titleBlock
+                metrics
             }
         }
         .padding(.horizontal, 28)
         .padding(.top, 26)
         .padding(.bottom, 12)
         .background(AppTheme.workspace)
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(viewModel.transcript?.displayTitle ?? "转写工作台")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Text(subtitle)
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textTertiary)
+                .lineLimit(2)
+                .truncationMode(.middle)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var metrics: some View {
+        HStack(spacing: 8) {
+            HeaderMetric(title: "历史", value: "\(viewModel.historyProjects.count)")
+            HeaderMetric(title: "片段", value: "\(viewModel.transcript?.segments.count ?? 0)")
+            HeaderMetric(title: "说话人", value: "\(viewModel.transcript?.speakerCount ?? 0)")
+        }
     }
 
     private var subtitle: String {
@@ -410,52 +429,66 @@ struct TranscriptEmptyStateView: View {
 
 struct WorkbenchHero: View {
     var body: some View {
-        HStack(alignment: .center, spacing: 24) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(AppTheme.accentWarm)
-                        .frame(width: 8, height: 8)
-                    Text("Ready to transcribe")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(AppTheme.textTertiary)
-                }
-
-                Text("把素材变成可编辑文稿")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundColor(AppTheme.textPrimary)
-                    .lineLimit(1)
-
-                Text("本地视频、音频和在线视频链接都从这里开始，完成后自动进入历史归档。")
-                    .font(.system(size: 13))
-                    .foregroundColor(AppTheme.textSecondary)
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 24) {
+                copyBlock
+                Spacer(minLength: 10)
+                heroMark
             }
 
-            Spacer(minLength: 10)
-
-            ZStack {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(AppTheme.accentLilac)
-                    .frame(width: 146, height: 118)
-                Circle()
-                    .fill(AppTheme.accentWarm)
-                    .frame(width: 16, height: 16)
-                    .offset(x: -56, y: -34)
-                Circle()
-                    .fill(AppTheme.accent)
-                    .frame(width: 13, height: 13)
-                    .offset(x: 58, y: 34)
-                Image(systemName: "waveform.and.magnifyingglass")
-                    .font(.system(size: 48, weight: .medium))
-                    .foregroundColor(AppTheme.textPrimary)
+            VStack(alignment: .leading, spacing: 18) {
+                copyBlock
+                heroMark
             }
         }
         .padding(22)
         .frame(minHeight: 154)
         .background(AppTheme.surface)
         .cornerRadius(AppTheme.cornerRadiusMedium)
+    }
+
+    private var copyBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(AppTheme.accentWarm)
+                    .frame(width: 8, height: 8)
+                Text("Ready to transcribe")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.textTertiary)
+            }
+
+            Text("把素材变成可编辑文稿")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("本地视频、音频和在线视频链接都从这里开始，完成后自动进入历史归档。")
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var heroMark: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(AppTheme.accentLilac)
+                .frame(width: 146, height: 118)
+            Circle()
+                .fill(AppTheme.accentWarm)
+                .frame(width: 16, height: 16)
+                .offset(x: -56, y: -34)
+            Circle()
+                .fill(AppTheme.accent)
+                .frame(width: 13, height: 13)
+                .offset(x: 58, y: 34)
+            Image(systemName: "waveform.and.magnifyingglass")
+                .font(.system(size: 48, weight: .medium))
+                .foregroundColor(AppTheme.textPrimary)
+        }
     }
 }
 
@@ -479,10 +512,12 @@ struct ActionPanel<Content: View>: View {
                     Text(title)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(AppTheme.textPrimary)
+                        .lineLimit(1)
                     Text(subtitle)
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textTertiary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -558,6 +593,7 @@ struct PrimaryActionButton: View {
                     .font(.system(size: 13, weight: .semibold))
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
                 Spacer()
             }
             .foregroundColor(.white)
@@ -566,7 +602,7 @@ struct PrimaryActionButton: View {
             .background(AppTheme.textPrimary)
             .cornerRadius(AppTheme.cornerRadiusMedium)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(WorkbenchPlainButtonStyle())
     }
 }
 
@@ -582,6 +618,7 @@ struct SecondaryActionButton: View {
                     .font(.system(size: 13, weight: .medium))
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
                 Spacer()
             }
             .foregroundColor(AppTheme.textSecondary)
@@ -590,7 +627,7 @@ struct SecondaryActionButton: View {
             .background(AppTheme.surfaceHover)
             .cornerRadius(AppTheme.cornerRadiusMedium)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(WorkbenchPlainButtonStyle())
     }
 }
 

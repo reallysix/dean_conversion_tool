@@ -181,6 +181,7 @@ private struct SidebarActionButton: View {
                     .frame(width: 18)
                 Text(title)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .lineLimit(1)
                 Spacer()
             }
             .foregroundColor(isSelected ? .white : AppTheme.textSecondary)
@@ -189,7 +190,7 @@ private struct SidebarActionButton: View {
             .background(isSelected ? AppTheme.textPrimary : Color.clear)
             .cornerRadius(AppTheme.cornerRadiusMedium)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(WorkbenchPlainButtonStyle())
     }
 }
 
@@ -209,6 +210,7 @@ private struct HistoryProjectRow: View {
                             .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
                             .foregroundColor(AppTheme.textPrimary)
                             .lineLimit(1)
+                            .truncationMode(.middle)
 
                         Spacer(minLength: 0)
 
@@ -300,13 +302,22 @@ private struct SelectedHistoryProjectCard: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(AppTheme.textPrimary)
                         .lineLimit(2)
+                        .truncationMode(.middle)
                 }
             }
 
-            HStack(spacing: 10) {
-                HistoryMetaLabel(icon: "play.circle", text: project.sourceType.displayName)
-                HistoryMetaLabel(icon: "clock", text: formatHistoryDuration(project.duration))
-                HistoryMetaLabel(icon: "text.alignleft", text: "\(project.segmentCount)")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    HistoryMetaLabel(icon: "play.circle", text: project.sourceType.displayName)
+                    HistoryMetaLabel(icon: "clock", text: formatHistoryDuration(project.duration))
+                    HistoryMetaLabel(icon: "text.alignleft", text: "\(project.segmentCount)")
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HistoryMetaLabel(icon: "play.circle", text: project.sourceType.displayName)
+                    HistoryMetaLabel(icon: "clock", text: formatHistoryDuration(project.duration))
+                    HistoryMetaLabel(icon: "text.alignleft", text: "\(project.segmentCount)")
+                }
             }
 
             Button(action: revealAction) {
@@ -323,7 +334,7 @@ private struct SelectedHistoryProjectCard: View {
                 .background(AppTheme.surface)
                 .cornerRadius(AppTheme.cornerRadiusSmall)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(WorkbenchPlainButtonStyle())
             .help(project.projectDirectory)
         }
         .padding(12)

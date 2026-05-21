@@ -368,6 +368,7 @@ struct EnvironmentStatusRow: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(AppTheme.textSecondary)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                     Text(item.isRequired ? "必需" : "可选")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundColor(item.isRequired ? AppTheme.textPrimary : AppTheme.textTertiary)
@@ -388,7 +389,7 @@ struct EnvironmentStatusRow: View {
                         }
                         .foregroundColor(AppTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(WorkbenchPlainButtonStyle())
                     .disabled(isInstalling)
                     .help(command)
                 }
@@ -397,6 +398,7 @@ struct EnvironmentStatusRow: View {
             Text(statusText)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(statusColor)
+                .fixedSize()
         }
     }
 
@@ -457,6 +459,8 @@ struct PropertyRow: View {
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.textPrimary)
                 .lineLimit(1)
+                .truncationMode(.middle)
+                .multilineTextAlignment(.trailing)
         }
     }
 }
@@ -476,7 +480,7 @@ struct PropertyButton: View {
                 .background(AppTheme.surface)
                 .cornerRadius(AppTheme.cornerRadiusSmall)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(WorkbenchPlainButtonStyle())
     }
 }
 
