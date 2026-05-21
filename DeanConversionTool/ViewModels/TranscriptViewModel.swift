@@ -71,6 +71,8 @@ class TranscriptViewModel: ObservableObject {
     @Published var lastFailedOnlineVideoURLString: String?
     @Published var playbackSeekTime: TimeInterval?
     @Published var playbackSeekRequestID = UUID()
+    @Published var isResolvingOnlinePreview = false
+    @Published var onlinePreviewError: String?
 
     // Selection is managed separately to avoid re-renders
     let selectionManager = SelectionManager()
@@ -321,6 +323,8 @@ class TranscriptViewModel: ObservableObject {
         } else {
             player = nil
         }
+        onlinePreviewError = nil
+        isResolvingOnlinePreview = false
 
         Task {
             do {
@@ -362,6 +366,8 @@ class TranscriptViewModel: ObservableObject {
         transcript = nil
         player = nil
         isVideoFile = false
+        onlinePreviewError = nil
+        isResolvingOnlinePreview = false
         progress = 0.0
 
         Task {
@@ -380,6 +386,7 @@ class TranscriptViewModel: ObservableObject {
                 }
 
                 self.transcript = finalTranscript
+                self.loadOnlinePreview(for: downloadedVideo.originalURL)
                 self.archiveTranscript(finalTranscript, sourceType: .onlineVideo)
                 self.progress = 1.0
                 self.loadingMessage = "完成！"
@@ -603,9 +610,51 @@ class TranscriptViewModel: ObservableObject {
             let sourceURL = archivedTranscript.sourceURL
             isVideoFile = sourceURL.isFileURL && videoExtensions.contains(sourceURL.pathExtension.lowercased())
             player = isVideoFile ? AVPlayer(url: sourceURL) : nil
+            onlinePreviewError = nil
+            isResolvingOnlinePreview = false
+            if !sourceURL.isFileURL {
+                loadOnlinePreview(for: sourceURL)
+            }
             lastFailedOnlineVideoURLString = nil
         } catch {
             self.error = "打开历史项目失败：\(error.localizedDescription)"
+        }
+    }
+
+    func loadOnlinePreview(for sourceURL: URL) {
+        guard !sourceURL.isFileURL else { return }
+        guard !isResolvingOnlinePreview else { return }
+
+        isResolvingOnlinePreview = true
+        onlinePreviewError = nil
+
+        Task {
+            do {
+                let playableURL = try await resolvePlayableVideoURL(from: sourceURL.absoluteString)
+                let previewPlayer = AVPlayer(url: playableURL)
+                previewPlayer.preventsDisplaySleepDuringVideoPlayback = true
+                player = previewPlayer
+                isVideoFile = false
+                onlinePreviewError = nil
+            } catch {
+                player = nil
+                onlinePreviewError = "内嵌播放器暂不可用：\(error.localizedDescription)"
+            }
+
+            isResolvingOnlinePreview = false
+        }
+    }
+
+    private func resolvePlayableVideoURL(from urlString: String) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let playableURL = try OnlineVideoService().playableVideoURL(from: urlString)
+                    continuation.resume(returning: playableURL)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
     }
 
@@ -880,6 +929,8 @@ class TranscriptViewModel: ObservableObject {
         cachedSearchText = nil
         error = nil
         lastFailedOnlineVideoURLString = nil
+        onlinePreviewError = nil
+        isResolvingOnlinePreview = false
         progress = 0.0
     }
 

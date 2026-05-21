@@ -1,49 +1,43 @@
 import SwiftUI
 import WebKit
+import AVFoundation
 
 struct OnlineVideoEmbedView: View {
     let sourceURL: URL
     let seekTime: TimeInterval?
     let seekRequestID: UUID
+    let isResolvingDirectPlayback: Bool
+    let previewError: String?
+    let retryAction: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: "play.rectangle")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.textPrimary)
-                    .frame(width: 28, height: 28)
-                    .background(AppTheme.accentWarm.opacity(0.55))
-                    .cornerRadius(AppTheme.cornerRadiusSmall)
+            OnlineVideoPreviewHeader(sourceURL: sourceURL, title: "在线视频预览")
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("在线视频预览")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppTheme.textPrimary)
-                    Text(sourceURL.absoluteString)
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textTertiary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+            ZStack {
+                OnlineVideoWebView(
+                    sourceURL: sourceURL,
+                    youtubeVideoID: youtubeVideoID(for: sourceURL),
+                    seekTime: seekTime,
+                    seekRequestID: seekRequestID
+                )
+
+                if isResolvingDirectPlayback {
+                    OnlineVideoPreviewStatus(
+                        icon: "hourglass",
+                        title: "正在准备内嵌播放器",
+                        message: "正在通过 yt-dlp 解析临时播放地址。"
+                    )
+                } else if let previewError {
+                    OnlineVideoPreviewStatus(
+                        icon: "exclamationmark.triangle",
+                        title: "在线播放暂不可用",
+                        message: previewError,
+                        retryAction: retryAction,
+                        openAction: { NSWorkspace.shared.open(sourceURL) }
+                    )
                 }
-
-                Spacer()
-
-                Button(action: { NSWorkspace.shared.open(sourceURL) }) {
-                    Image(systemName: "safari")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(AppTheme.textSecondary)
-                }
-                .buttonStyle(.plain)
-                .help("在浏览器中打开")
             }
-
-            OnlineVideoWebView(
-                sourceURL: sourceURL,
-                youtubeVideoID: youtubeVideoID(for: sourceURL),
-                seekTime: seekTime,
-                seekRequestID: seekRequestID
-            )
                 .frame(height: 260)
                 .background(Color.black)
                 .cornerRadius(AppTheme.cornerRadiusMedium)
@@ -78,6 +72,106 @@ struct OnlineVideoEmbedView: View {
         }
 
         return nil
+    }
+}
+
+struct OnlineVideoPlayerPreview: View {
+    let sourceURL: URL
+    let player: AVPlayer
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            OnlineVideoPreviewHeader(sourceURL: sourceURL, title: "在线视频播放")
+
+            CompactVideoPlayerView(player: player)
+                .frame(height: 260)
+                .cornerRadius(AppTheme.cornerRadiusMedium)
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMedium)
+                        .stroke(AppTheme.border)
+                )
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 14)
+        .background(AppTheme.workspace)
+    }
+}
+
+struct OnlineVideoPreviewHeader: View {
+    let sourceURL: URL
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "play.rectangle")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary)
+                .frame(width: 28, height: 28)
+                .background(AppTheme.accentWarm.opacity(0.55))
+                .cornerRadius(AppTheme.cornerRadiusSmall)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+                Text(sourceURL.absoluteString)
+                    .font(.system(size: 10))
+                    .foregroundColor(AppTheme.textTertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Spacer()
+
+            Button(action: { NSWorkspace.shared.open(sourceURL) }) {
+                Image(systemName: "safari")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary)
+            }
+            .buttonStyle(.plain)
+            .help("在浏览器中打开")
+        }
+    }
+}
+
+struct OnlineVideoPreviewStatus: View {
+    let icon: String
+    let title: String
+    let message: String
+    var retryAction: (() -> Void)?
+    var openAction: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundColor(AppTheme.accentWarm)
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+            Text(message)
+                .font(.system(size: 11))
+                .foregroundColor(.white.opacity(0.72))
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .frame(maxWidth: 420)
+
+            HStack(spacing: 12) {
+                if let retryAction {
+                    Button("重试播放", action: retryAction)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                if let openAction {
+                    Button("浏览器打开", action: openAction)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(AppTheme.accentWarm)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(24)
+        .background(Color.black.opacity(0.82))
     }
 }
 

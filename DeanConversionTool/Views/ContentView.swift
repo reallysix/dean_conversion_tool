@@ -134,11 +134,18 @@ struct TranscriptContainerView: View {
             CompactVideoPlayerView(player: player)
             Rectangle().fill(AppTheme.border).frame(height: 1)
         } else if let sourceURL = viewModel.transcript?.sourceURL, !sourceURL.isFileURL {
-            OnlineVideoEmbedView(
-                sourceURL: sourceURL,
-                seekTime: viewModel.playbackSeekTime,
-                seekRequestID: viewModel.playbackSeekRequestID
-            )
+            if let player = viewModel.player {
+                OnlineVideoPlayerPreview(sourceURL: sourceURL, player: player)
+            } else {
+                OnlineVideoEmbedView(
+                    sourceURL: sourceURL,
+                    seekTime: viewModel.playbackSeekTime,
+                    seekRequestID: viewModel.playbackSeekRequestID,
+                    isResolvingDirectPlayback: viewModel.isResolvingOnlinePreview,
+                    previewError: viewModel.onlinePreviewError,
+                    retryAction: { viewModel.loadOnlinePreview(for: sourceURL) }
+                )
+            }
             Rectangle().fill(AppTheme.border).frame(height: 1)
         }
     }

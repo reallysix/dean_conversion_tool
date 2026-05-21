@@ -15,6 +15,62 @@ final class OnlineVideoService {
         denoPath != nil
     }
 
+    func playableVideoURL(from urlString: String) throws -> URL {
+        guard let originalURL = URL(string: urlString), originalURL.scheme != nil else {
+            throw OnlineVideoError.invalidURL
+        }
+        guard let ytDLPPath else {
+            throw OnlineVideoError.ytDLPNotInstalled
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: ytDLPPath)
+        process.environment = processEnvironment
+
+        var arguments = [
+            "--no-playlist",
+            "--format", "best[ext=mp4]/best",
+            "--get-url"
+        ]
+
+        if let ffmpegLocation {
+            arguments.append(contentsOf: ["--ffmpeg-location", ffmpegLocation])
+        }
+
+        if let denoPath {
+            arguments.append(contentsOf: ["--js-runtimes", "deno:\(denoPath)"])
+        }
+
+        arguments.append(originalURL.absoluteString)
+        process.arguments = arguments
+
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let output = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let errorOutput = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+
+        guard process.terminationStatus == 0 else {
+            throw OnlineVideoError.downloadFailed(errorOutput.isEmpty ? output : errorOutput)
+        }
+
+        let firstURLString = output
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+
+        guard let firstURLString, let playableURL = URL(string: firstURLString) else {
+            throw OnlineVideoError.playableURLMissing
+        }
+
+        return playableURL
+    }
+
     func downloadAudio(from urlString: String) throws -> OnlineVideoDownload {
         guard let originalURL = URL(string: urlString), originalURL.scheme != nil else {
             throw OnlineVideoError.invalidURL
@@ -171,6 +227,7 @@ enum OnlineVideoError: LocalizedError {
     case ytDLPNotInstalled
     case downloadFailed(String)
     case downloadedAudioMissing
+    case playableURLMissing
 
     var errorDescription: String? {
         switch self {
@@ -182,6 +239,8 @@ enum OnlineVideoError: LocalizedError {
             return "在线视频下载失败：\(Self.userFacingDownloadMessage(from: message))"
         case .downloadedAudioMissing:
             return "在线视频下载完成，但没有找到可转写的音频文件"
+        case .playableURLMissing:
+            return "在线视频解析完成，但没有找到可播放的视频地址"
         }
     }
 
