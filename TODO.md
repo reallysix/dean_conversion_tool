@@ -74,8 +74,8 @@
 
 - [ ] 配置正式 Bundle ID。
 - [ ] 配置 Apple Developer Team ID。
-- [ ] 配置 Release code signing。
-- [ ] 增加 notarization 公证流程。
+- [x] 配置 Release code signing。
+- [x] 增加 notarization 公证流程。
 - [ ] 验证未安装开发环境的机器能否正常打开。
 
 ## 后续可选能力

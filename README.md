@@ -90,7 +90,7 @@ open DeanConversionTool.xcodeproj
 
 ## 打包 DMG
 
-当前支持生成本地未签名 `.dmg`，用于安装包流程和非 Xcode 启动验证：
+默认生成本地未签名 `.dmg`，用于安装包流程和非 Xcode 启动验证：
 
 ```bash
 Scripts/package_app.sh
@@ -102,7 +102,28 @@ Scripts/package_app.sh
 build/package/Release/Dean Conversion Tool.dmg
 ```
 
-打包脚本会先检查本机依赖、生成 Xcode 项目、构建 Release `.app`、校验必要资源，然后创建 DMG。当前安装包还未做正式签名和 notarization 公证。
+打包脚本会先检查本机依赖、生成 Xcode 项目、构建 Release `.app`、校验必要资源，然后创建 DMG。
+
+如果要生成正式签名版本，先复制示例配置并填入 Apple Developer 信息：
+
+```bash
+cp Scripts/release_config.example.env Scripts/release_config.env
+open Scripts/release_config.env
+```
+
+然后运行：
+
+```bash
+Scripts/package_app.sh
+```
+
+如果已经在本机钥匙串保存了 notarization 凭据，可以同时提交公证：
+
+```bash
+Scripts/package_app.sh --notarize
+```
+
+`Scripts/release_config.env` 不会提交到 Git。需要配置的值包括正式 Bundle ID、Apple Team ID、Developer ID Application 证书名和 `notarytool` profile。
 
 ## 使用流程
 

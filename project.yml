@@ -82,7 +82,7 @@ targets:
               - public.mpeg-4
               - org.matroska.mkv
         CFBundleExecutable: "$(EXECUTABLE_NAME)"
-        CFBundleIdentifier: com.dean.conversiontool
+        CFBundleIdentifier: "$(PRODUCT_BUNDLE_IDENTIFIER)"
         CFBundleInfoDictionaryVersion: "6.0"
         CFBundleName: 语音转文字工具
         CFBundlePackageType: APPL

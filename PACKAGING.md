@@ -1,6 +1,6 @@
 # Packaging
 
-This project currently supports a local unsigned macOS package flow. Formal code signing and notarization are still tracked in `TODO.md`.
+This project supports a local unsigned macOS package flow, plus an opt-in Developer ID signing and notarization flow when Apple Developer values are provided locally.
 
 ## Package Types
 
@@ -46,6 +46,36 @@ To skip local dependency checks:
 Scripts/package_app.sh --skip-dependency-check
 ```
 
+## Signing Configuration
+
+Unsigned packaging remains the default so local development does not require an Apple Developer account.
+
+For signed release builds, copy the example config and fill in real Apple Developer values:
+
+```bash
+cp Scripts/release_config.example.env Scripts/release_config.env
+open Scripts/release_config.env
+```
+
+`Scripts/release_config.env` is ignored by Git. It can define:
+
+- `APP_BUNDLE_ID`: the registered reverse-DNS bundle identifier.
+- `APPLE_TEAM_ID`: the Apple Developer Team ID.
+- `DEVELOPER_ID_APPLICATION`: the exact Developer ID Application certificate name from Keychain Access.
+- `NOTARYTOOL_PROFILE`: the keychain profile created with `xcrun notarytool store-credentials`.
+
+With signing values present, the package script enables manual Developer ID signing and hardened runtime:
+
+```bash
+Scripts/package_app.sh
+```
+
+To submit the generated DMG for notarization and staple the result:
+
+```bash
+Scripts/package_app.sh --notarize
+```
+
 ## Output Paths
 
 - App bundle: `build/package/Release/staging/Dean Conversion Tool.app`
@@ -54,8 +84,8 @@ Scripts/package_app.sh --skip-dependency-check
 
 ## Current Limitations
 
-- The package is unsigned.
-- The package is not notarized.
+- The package is unsigned unless `Scripts/release_config.env` provides Developer ID signing values.
+- Notarization requires a local `notarytool` profile and must be requested with `--notarize`.
 - The app still depends on local command-line tools such as `whisper-cli`, `ffmpeg`, `ffprobe`, `yt-dlp`, and `deno`.
 - The Whisper model is not bundled. The app should download or locate it at runtime.
 
@@ -77,6 +107,8 @@ Future releases can add a model picker and optional small-model downloads, but t
 
 - [ ] Run `Scripts/package_app.sh`.
 - [ ] Open the app from `build/package/Release/staging`.
+- [ ] For signed releases, run `codesign --verify --deep --strict --verbose=2 "build/package/Release/staging/Dean Conversion Tool.app"`.
+- [ ] For notarized releases, run `spctl --assess --type open --verbose "build/package/Release/Dean Conversion Tool.dmg"`.
 - [ ] Confirm the right-side environment status detects dependencies correctly.
 - [ ] Confirm local file transcription still starts.
 - [ ] Confirm online URL transcription reports clear dependency errors when tools are missing.
