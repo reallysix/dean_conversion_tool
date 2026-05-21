@@ -91,6 +91,7 @@ struct OnlineVideoWebView: NSViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = true
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.allowsBackForwardNavigationGestures = true
@@ -132,13 +133,18 @@ struct OnlineVideoWebView: NSViewRepresentable {
     private func seek(in webView: WKWebView, to time: TimeInterval) {
         guard youtubeVideoID != nil else { return }
         let seconds = max(0, time)
-        webView.evaluateJavaScript("seekToTranscriptTime(\(seconds));")
+        webView.evaluateJavaScript("seekToTranscriptTime(\(seconds));") { _, error in
+            if let error {
+                print("Online video seek failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     private func youtubeHTML(videoID: String) -> String {
         let escapedVideoID = videoID
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
+        let embedURL = "https://www.youtube.com/embed/\(escapedVideoID)?enablejsapi=1&playsinline=1&rel=0&modestbranding=1&origin=https%3A%2F%2Fwww.youtube.com"
 
         return """
         <!doctype html>
@@ -147,36 +153,38 @@ struct OnlineVideoWebView: NSViewRepresentable {
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <style>
             html, body, #player { width: 100%; height: 100%; margin: 0; background: #000; overflow: hidden; }
+            iframe { width: 100%; height: 100%; border: 0; display: block; }
           </style>
         </head>
         <body>
-          <div id="player"></div>
-          <script src="https://www.youtube.com/iframe_api"></script>
+          <iframe
+            id="player"
+            src="\(embedURL)"
+            title="YouTube video player"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen>
+          </iframe>
           <script>
-            var player;
             var pendingSeek = null;
-            function onYouTubeIframeAPIReady() {
-              player = new YT.Player('player', {
-                width: '100%',
-                height: '100%',
-                videoId: '\(escapedVideoID)',
-                playerVars: { playsinline: 1, rel: 0 },
-                events: {
-                  onReady: function() {
-                    if (pendingSeek !== null) {
-                      player.seekTo(pendingSeek, true);
-                      pendingSeek = null;
-                    }
-                  }
-                }
-              });
-            }
-            function seekToTranscriptTime(seconds) {
-              if (player && typeof player.seekTo === 'function') {
-                player.seekTo(seconds, true);
-              } else {
-                pendingSeek = seconds;
+            var player = document.getElementById('player');
+
+            player.addEventListener('load', function() {
+              if (pendingSeek !== null) {
+                seekToTranscriptTime(pendingSeek);
+                pendingSeek = null;
               }
+            });
+
+            function seekToTranscriptTime(seconds) {
+              if (!player || !player.contentWindow) {
+                pendingSeek = seconds;
+                return;
+              }
+              player.contentWindow.postMessage(JSON.stringify({
+                event: 'command',
+                func: 'seekTo',
+                args: [seconds, true]
+              }), 'https://www.youtube.com');
             }
           </script>
         </body>
