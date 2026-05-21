@@ -53,6 +53,9 @@ class TranscriptViewModel: ObservableObject {
     @Published var exportStatusIsError = false
     @Published var lastExportedFileURL: URL?
     @Published var setupClipboardMessage: String?
+    @Published var lastFailedOnlineVideoURLString: String?
+    @Published var playbackSeekTime: TimeInterval?
+    @Published var playbackSeekRequestID = UUID()
 
     // Selection is managed separately to avoid re-renders
     let selectionManager = SelectionManager()
@@ -237,6 +240,10 @@ class TranscriptViewModel: ObservableObject {
         setupStatusItems.filter { !$0.isRequired && !$0.isAvailable }.count
     }
 
+    var canRetryOnlineVideo: Bool {
+        lastFailedOnlineVideoURLString?.isEmpty == false && !isLoading
+    }
+
     var onlineVideoInputState: OnlineVideoInputState {
         let trimmed = onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -283,6 +290,7 @@ class TranscriptViewModel: ObservableObject {
 
         isLoading = true
         error = nil
+        lastFailedOnlineVideoURLString = nil
         transcript = nil
         progress = 0.0
 
@@ -335,6 +343,7 @@ class TranscriptViewModel: ObservableObject {
 
         isLoading = true
         error = nil
+        lastFailedOnlineVideoURLString = nil
         transcript = nil
         player = nil
         isVideoFile = false
@@ -361,6 +370,7 @@ class TranscriptViewModel: ObservableObject {
                 self.loadingMessage = "完成！"
             } catch {
                 self.error = error.localizedDescription
+                self.lastFailedOnlineVideoURLString = normalizedURLString
             }
 
             if let download {
@@ -578,9 +588,15 @@ class TranscriptViewModel: ObservableObject {
             let sourceURL = archivedTranscript.sourceURL
             isVideoFile = sourceURL.isFileURL && videoExtensions.contains(sourceURL.pathExtension.lowercased())
             player = isVideoFile ? AVPlayer(url: sourceURL) : nil
+            lastFailedOnlineVideoURLString = nil
         } catch {
             self.error = "打开历史项目失败：\(error.localizedDescription)"
         }
+    }
+
+    func retryOnlineVideo() {
+        guard let lastFailedOnlineVideoURLString else { return }
+        processOnlineVideo(urlString: lastFailedOnlineVideoURLString)
     }
 
     private func archiveTranscript(_ transcript: Transcript, sourceType: ProjectSourceType) {
@@ -751,6 +767,7 @@ class TranscriptViewModel: ObservableObject {
         cachedTranscriptID = nil
         cachedSearchText = nil
         error = nil
+        lastFailedOnlineVideoURLString = nil
         progress = 0.0
     }
 
@@ -778,9 +795,13 @@ class TranscriptViewModel: ObservableObject {
 
     /// Seek video to a specific time
     func seekTo(time: TimeInterval) {
-        guard let player = player else { return }
-        let cmTime = CMTime(seconds: time, preferredTimescale: 600)
-        player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        playbackSeekTime = time
+        playbackSeekRequestID = UUID()
+
+        if let player {
+            let cmTime = CMTime(seconds: time, preferredTimescale: 600)
+            player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        }
     }
 
     // MARK: - Batch Processing

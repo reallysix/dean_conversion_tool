@@ -66,6 +66,7 @@ final class HistoryProjectStore {
             title: title,
             sourceType: sourceType,
             sourceLocation: transcript.sourceURL.isFileURL ? transcript.sourceURL.path : transcript.sourceURL.absoluteString,
+            onlineMetadata: onlineMetadata(for: transcript, sourceType: sourceType),
             createdAt: createdAt,
             updatedAt: Date(),
             duration: transcript.duration,
@@ -82,6 +83,17 @@ final class HistoryProjectStore {
 
         try writeProjectMetadata(project)
         return project
+    }
+
+    private func onlineMetadata(for transcript: Transcript, sourceType: ProjectSourceType) -> OnlineSourceMetadata? {
+        guard sourceType == .onlineVideo else { return nil }
+
+        return OnlineSourceMetadata(
+            title: transcript.displayTitle,
+            originalURL: transcript.sourceURL.absoluteString,
+            platform: platformName(for: transcript.sourceURL),
+            createdAt: transcript.createdAt
+        )
     }
 
     func loadTranscript(for project: HistoryProject) throws -> Transcript {
@@ -125,6 +137,26 @@ final class HistoryProjectStore {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         return formatter.string(from: date)
+    }
+
+    private func platformName(for url: URL) -> String {
+        guard let host = url.host?.lowercased() else { return "公开网页视频" }
+        if host.contains("youtube.com") || host.contains("youtu.be") {
+            return "YouTube"
+        }
+        if host.contains("bilibili.com") || host.contains("b23.tv") {
+            return "B 站"
+        }
+        if host.contains("douyin.com") {
+            return "抖音"
+        }
+        if host.contains("tiktok.com") {
+            return "TikTok"
+        }
+        if host.contains("vimeo.com") {
+            return "Vimeo"
+        }
+        return "公开网页视频"
     }
 }
 

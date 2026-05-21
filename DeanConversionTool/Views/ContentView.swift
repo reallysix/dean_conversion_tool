@@ -95,21 +95,8 @@ struct TranscriptContainerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if viewModel.isLoading {
-                LoadingView(message: viewModel.loadingMessage, progress: viewModel.progress)
-            }
-
-            if let error = viewModel.error {
-                ErrorBanner(message: error) { viewModel.error = nil }
-            }
-
-            if let player = viewModel.player, viewModel.isVideoFile {
-                CompactVideoPlayerView(player: player)
-                Rectangle().fill(AppTheme.border).frame(height: 1)
-            } else if let sourceURL = viewModel.transcript?.sourceURL, !sourceURL.isFileURL {
-                OnlineVideoEmbedView(sourceURL: sourceURL)
-                Rectangle().fill(AppTheme.border).frame(height: 1)
-            }
+            loadingAndErrorViews
+            mediaPreview
 
             WorkspaceHeader(viewModel: viewModel)
             TranscriptToolbar(viewModel: viewModel)
@@ -119,6 +106,40 @@ struct TranscriptContainerView: View {
             } else if !viewModel.isLoading {
                 WelcomeView(viewModel: viewModel)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var loadingAndErrorViews: some View {
+        if viewModel.isLoading {
+            LoadingView(message: viewModel.loadingMessage, progress: viewModel.progress)
+        }
+
+        if let error = viewModel.error {
+            if viewModel.canRetryOnlineVideo {
+                ErrorBanner(message: error, retryTitle: "重试", onRetry: viewModel.retryOnlineVideo) {
+                    viewModel.error = nil
+                }
+            } else {
+                ErrorBanner(message: error) {
+                    viewModel.error = nil
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mediaPreview: some View {
+        if let player = viewModel.player, viewModel.isVideoFile {
+            CompactVideoPlayerView(player: player)
+            Rectangle().fill(AppTheme.border).frame(height: 1)
+        } else if let sourceURL = viewModel.transcript?.sourceURL, !sourceURL.isFileURL {
+            OnlineVideoEmbedView(
+                sourceURL: sourceURL,
+                seekTime: viewModel.playbackSeekTime,
+                seekRequestID: viewModel.playbackSeekRequestID
+            )
+            Rectangle().fill(AppTheme.border).frame(height: 1)
         }
     }
 }
@@ -522,6 +543,8 @@ struct LoadingView: View {
 
 struct ErrorBanner: View {
     let message: String
+    var retryTitle: String?
+    var onRetry: (() -> Void)?
     let onDismiss: () -> Void
 
     var body: some View {
@@ -533,6 +556,14 @@ struct ErrorBanner: View {
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.danger)
             Spacer()
+            if let retryTitle, let onRetry {
+                Button(action: onRetry) {
+                    Text(retryTitle)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.danger)
+                }
+                .buttonStyle(.plain)
+            }
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .medium))

@@ -12,7 +12,7 @@ struct TranscriptView: View {
             segments: viewModel.filteredSegments,
             selectedIDs: selectionManager.selectedIDs,
             onToggle: { id in selectionManager.toggle(id) },
-            onSeek: viewModel.player != nil ? { time in viewModel.seekTo(time: time) } : nil
+            onSeek: { time in viewModel.seekTo(time: time) }
         )
     }
 }
@@ -238,6 +238,8 @@ struct TranscriptLine: View, Equatable {
                 .foregroundColor(AppTheme.textPrimary)
                 .textSelection(.enabled)
                 .lineSpacing(3)
+                .onTapGesture { onSeek?(segment.startTime) }
+                .help("点击跳转到此时间点")
 
             Spacer()
         }

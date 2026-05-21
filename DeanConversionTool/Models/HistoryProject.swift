@@ -35,11 +35,19 @@ struct ProjectOutputs: Codable, Equatable {
     var transcriptMarkdown: String?
 }
 
+struct OnlineSourceMetadata: Codable, Equatable {
+    var title: String
+    var originalURL: String
+    var platform: String
+    var createdAt: Date
+}
+
 struct HistoryProject: Identifiable, Codable, Equatable {
     let id: UUID
     var title: String
     var sourceType: ProjectSourceType
     var sourceLocation: String
+    var onlineMetadata: OnlineSourceMetadata?
     var createdAt: Date
     var updatedAt: Date
     var duration: TimeInterval
