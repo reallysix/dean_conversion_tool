@@ -71,6 +71,7 @@ class TranscriptViewModel: ObservableObject {
     @Published var lastFailedOnlineVideoURLString: String?
     @Published var playbackSeekTime: TimeInterval?
     @Published var playbackSeekRequestID = UUID()
+    @Published var playbackCurrentTime: TimeInterval = 0
     @Published var isResolvingOnlinePreview = false
     @Published var onlinePreviewError: String?
 
@@ -161,6 +162,13 @@ class TranscriptViewModel: ObservableObject {
 
     var speakers: [String] {
         return transcript?.speakers ?? []
+    }
+
+    var activePlaybackSegmentID: UUID? {
+        guard let transcript, playbackCurrentTime >= 0 else { return nil }
+        return transcript.segments.first { segment in
+            playbackCurrentTime >= segment.startTime && playbackCurrentTime < segment.endTime
+        }?.id
     }
 
     var isModelLoaded: Bool {
@@ -315,6 +323,7 @@ class TranscriptViewModel: ObservableObject {
         lastFailedOnlineVideoURLString = nil
         transcript = nil
         progress = 0.0
+        playbackCurrentTime = 0
 
         // Check if it's a video file and set up player
         let videoExtensions = ["mp4", "mov", "avi", "mkv", "webm", "m4v"]
@@ -371,6 +380,7 @@ class TranscriptViewModel: ObservableObject {
         transcript = nil
         player = nil
         isVideoFile = false
+        playbackCurrentTime = 0
         onlinePreviewError = nil
         isResolvingOnlinePreview = false
         progress = 0.0
@@ -606,6 +616,7 @@ class TranscriptViewModel: ObservableObject {
             selectedProjectID = project.id
             error = nil
             searchText = ""
+            playbackCurrentTime = 0
             selectionManager.deselectAll()
             cachedSegments = []
             cachedTranscriptID = nil
@@ -968,6 +979,7 @@ class TranscriptViewModel: ObservableObject {
 
     /// Seek video to a specific time
     func seekTo(time: TimeInterval) {
+        playbackCurrentTime = max(0, time)
         playbackSeekTime = time
         playbackSeekRequestID = UUID()
 

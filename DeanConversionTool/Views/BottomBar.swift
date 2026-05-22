@@ -34,6 +34,7 @@ struct BottomBar: View {
                     get: { currentTime },
                     set: { newValue in
                         currentTime = newValue
+                        viewModel.playbackCurrentTime = newValue
                         viewModel.player?.seek(to: CMTime(seconds: newValue, preferredTimescale: 600))
                     }
                 ), in: 0...max(duration, 1))
@@ -99,11 +100,15 @@ struct BottomBar: View {
             forInterval: CMTime(seconds: 0.1, preferredTimescale: 10),
             queue: .main
         ) { time in
-            currentTime = time.seconds
-            isPlaying = player.rate > 0
-            // Update duration if it becomes available later
-            if duration == 0, let itemDuration = player.currentItem?.duration, itemDuration.isNumeric {
-                duration = itemDuration.seconds
+            let seconds = time.seconds
+            Task { @MainActor in
+                currentTime = seconds
+                viewModel.playbackCurrentTime = seconds
+                isPlaying = player.rate > 0
+                // Update duration if it becomes available later
+                if duration == 0, let itemDuration = player.currentItem?.duration, itemDuration.isNumeric {
+                    duration = itemDuration.seconds
+                }
             }
         }
         observedPlayer = player

@@ -11,6 +11,7 @@ struct TranscriptView: View {
         SpeakerGroupedListView(
             segments: viewModel.filteredSegments,
             selectedIDs: selectionManager.selectedIDs,
+            activeSegmentID: viewModel.activePlaybackSegmentID,
             onToggle: { id in selectionManager.toggle(id) },
             onSeek: { time in viewModel.seekTo(time: time) }
         )
@@ -85,6 +86,7 @@ struct TranscriptToolbar: View {
 struct SpeakerGroupedListView: View {
     let segments: [TranscriptSegment]
     let selectedIDs: Set<UUID>
+    let activeSegmentID: UUID?
     let onToggle: (UUID) -> Void
     let onSeek: ((TimeInterval) -> Void)?
 
@@ -111,20 +113,29 @@ struct SpeakerGroupedListView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
-                ForEach(groupedBlocks.indices, id: \.self) { index in
-                    let block = groupedBlocks[index]
-                    SpeakerBlock(
-                        speaker: block.speaker,
-                        segments: block.segments,
-                        selectedIDs: selectedIDs,
-                        onToggle: onToggle,
-                        onSeek: onSeek
-                    )
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    ForEach(groupedBlocks.indices, id: \.self) { index in
+                        let block = groupedBlocks[index]
+                        SpeakerBlock(
+                            speaker: block.speaker,
+                            segments: block.segments,
+                            selectedIDs: selectedIDs,
+                            activeSegmentID: activeSegmentID,
+                            onToggle: onToggle,
+                            onSeek: onSeek
+                        )
+                    }
+                }
+                .padding(20)
+            }
+            .onChange(of: activeSegmentID) {
+                guard let activeSegmentID else { return }
+                withAnimation(.easeOut(duration: 0.24)) {
+                    proxy.scrollTo(activeSegmentID, anchor: .center)
                 }
             }
-            .padding(20)
         }
     }
 }
@@ -135,6 +146,7 @@ struct SpeakerBlock: View {
     let speaker: String?
     let segments: [TranscriptSegment]
     let selectedIDs: Set<UUID>
+    let activeSegmentID: UUID?
     let onToggle: (UUID) -> Void
     let onSeek: ((TimeInterval) -> Void)?
 
@@ -163,9 +175,11 @@ struct SpeakerBlock: View {
                     TranscriptLine(
                         segment: segment,
                         isSelected: selectedIDs.contains(segment.id),
+                        isActive: activeSegmentID == segment.id,
                         onToggle: { onToggle(segment.id) },
                         onSeek: onSeek
                     )
+                    .id(segment.id)
                 }
             }
         }
@@ -208,6 +222,7 @@ struct SpeakerAvatar: View {
 struct TranscriptLine: View, Equatable {
     let segment: TranscriptSegment
     let isSelected: Bool
+    let isActive: Bool
     let onToggle: () -> Void
     let onSeek: ((TimeInterval) -> Void)?
 
@@ -215,7 +230,8 @@ struct TranscriptLine: View, Equatable {
         lhs.segment.id == rhs.segment.id &&
         lhs.segment.text == rhs.segment.text &&
         lhs.segment.speaker == rhs.segment.speaker &&
-        lhs.isSelected == rhs.isSelected
+        lhs.isSelected == rhs.isSelected &&
+        lhs.isActive == rhs.isActive
     }
 
     var body: some View {
@@ -229,13 +245,18 @@ struct TranscriptLine: View, Equatable {
 
             Text(segment.displayTimestamp)
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(AppTheme.accent)
+                .foregroundColor(isActive ? AppTheme.textPrimary : AppTheme.accent)
+                .padding(.horizontal, isActive ? 6 : 0)
+                .padding(.vertical, isActive ? 2 : 0)
+                .background(isActive ? AppTheme.accentWarm.opacity(0.75) : Color.clear)
+                .cornerRadius(AppTheme.cornerRadiusSmall)
                 .onTapGesture { onSeek?(segment.startTime) }
                 .help("点击跳转到此时间点")
 
             Text(segment.text)
                 .font(.system(size: 14))
-                .foregroundColor(AppTheme.textPrimary)
+                .fontWeight(isActive ? .medium : .regular)
+                .foregroundColor(isActive ? AppTheme.textPrimary : AppTheme.textPrimary)
                 .textSelection(.enabled)
                 .lineSpacing(3)
                 .onTapGesture { onSeek?(segment.startTime) }
@@ -243,10 +264,24 @@ struct TranscriptLine: View, Equatable {
 
             Spacer()
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, 5)
         .padding(.horizontal, 8)
-        .background(isSelected ? AppTheme.accentSubtle : Color.clear)
+        .background(lineBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadiusSmall)
+                .stroke(isActive ? AppTheme.accentWarm.opacity(0.8) : Color.clear, lineWidth: 1)
+        )
         .cornerRadius(AppTheme.cornerRadiusSmall)
+    }
+
+    private var lineBackground: Color {
+        if isActive {
+            return AppTheme.accentWarm.opacity(0.16)
+        }
+        if isSelected {
+            return AppTheme.accentSubtle
+        }
+        return Color.clear
     }
 }
 
