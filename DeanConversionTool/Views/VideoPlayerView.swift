@@ -1,16 +1,29 @@
 import SwiftUI
 import AVKit
 import AVFoundation
+import CoreImage
 
 /// Custom NSView using AVPlayerLayer directly to avoid VisionKit/Metal crash
 class PlayerNSView: NSView {
-    private let playerLayer = AVPlayerLayer()
+    private let backgroundPlayerLayer = AVPlayerLayer()
+    private let foregroundPlayerLayer = AVPlayerLayer()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        layer?.addSublayer(playerLayer)
-        playerLayer.videoGravity = .resizeAspect
+        layer?.masksToBounds = true
+        layer?.backgroundColor = NSColor.black.cgColor
+
+        backgroundPlayerLayer.videoGravity = .resizeAspectFill
+        backgroundPlayerLayer.opacity = 0.42
+        if let blurFilter = CIFilter(name: "CIGaussianBlur", parameters: ["inputRadius": 22]) {
+            backgroundPlayerLayer.filters = [blurFilter]
+        }
+
+        foregroundPlayerLayer.videoGravity = .resizeAspect
+
+        layer?.addSublayer(backgroundPlayerLayer)
+        layer?.addSublayer(foregroundPlayerLayer)
     }
 
     required init?(coder: NSCoder) {
@@ -18,12 +31,14 @@ class PlayerNSView: NSView {
     }
 
     func setPlayer(_ player: AVPlayer) {
-        playerLayer.player = player
+        backgroundPlayerLayer.player = player
+        foregroundPlayerLayer.player = player
     }
 
     override func layout() {
         super.layout()
-        playerLayer.frame = bounds
+        backgroundPlayerLayer.frame = bounds.insetBy(dx: -28, dy: -28)
+        foregroundPlayerLayer.frame = bounds
     }
 }
 
@@ -49,6 +64,6 @@ struct CompactVideoPlayerView: View {
     var body: some View {
         VideoPlayerView(player: player)
             .frame(minHeight: 200, maxHeight: 400)
-            .background(Color.black)
+            .background(Color(hex: 0x111015))
     }
 }

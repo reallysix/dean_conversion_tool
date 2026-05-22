@@ -138,6 +138,7 @@ struct TranscriptContainerView: View {
     private var mediaPreview: some View {
         if let player = viewModel.player, viewModel.isVideoFile {
             CompactVideoPlayerView(player: player)
+                .frame(height: 260)
             Rectangle().fill(AppTheme.border).frame(height: 1)
         } else if let sourceURL = viewModel.transcript?.sourceURL, !sourceURL.isFileURL {
             if let player = viewModel.player {

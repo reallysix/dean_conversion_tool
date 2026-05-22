@@ -11,7 +11,7 @@ struct OnlineVideoEmbedView: View {
     let retryAction: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             OnlineVideoPreviewHeader(sourceURL: sourceURL, title: "在线视频预览")
 
             ZStack {
@@ -39,7 +39,7 @@ struct OnlineVideoEmbedView: View {
                 }
             }
                 .frame(height: 260)
-                .background(Color.black)
+                .background(Color(hex: 0x111015))
                 .cornerRadius(AppTheme.cornerRadiusMedium)
                 .overlay(
                     RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMedium)
@@ -47,7 +47,8 @@ struct OnlineVideoEmbedView: View {
                 )
         }
         .padding(.horizontal, 28)
-        .padding(.vertical, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
         .background(AppTheme.workspace)
     }
 
@@ -80,7 +81,7 @@ struct OnlineVideoPlayerPreview: View {
     let player: AVPlayer
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             OnlineVideoPreviewHeader(sourceURL: sourceURL, title: "在线视频播放")
 
             CompactVideoPlayerView(player: player)
@@ -92,7 +93,8 @@ struct OnlineVideoPlayerPreview: View {
                 )
         }
         .padding(.horizontal, 28)
-        .padding(.vertical, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
         .background(AppTheme.workspace)
     }
 }
@@ -106,11 +108,11 @@ struct OnlineVideoPreviewHeader: View {
             Image(systemName: "play.rectangle")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(AppTheme.textPrimary)
-                .frame(width: 28, height: 28)
+                .frame(width: 26, height: 26)
                 .background(AppTheme.accentWarm.opacity(0.55))
                 .cornerRadius(AppTheme.cornerRadiusSmall)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.textPrimary)
@@ -131,6 +133,7 @@ struct OnlineVideoPreviewHeader: View {
             .buttonStyle(.plain)
             .help("在浏览器中打开")
         }
+        .frame(height: 30)
     }
 }
 

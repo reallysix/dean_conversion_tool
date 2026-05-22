@@ -17,11 +17,11 @@ struct BottomBar: View {
                     Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 14))
                         .foregroundColor(AppTheme.textPrimary)
-                        .frame(width: 28, height: 28)
-                        .background(AppTheme.surface)
+                        .frame(width: 34, height: 34)
+                        .background(AppTheme.surfaceHover)
                         .cornerRadius(AppTheme.cornerRadiusSmall)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(WorkbenchPlainButtonStyle())
 
                 // Current time
                 Text(formatTime(currentTime))
@@ -53,9 +53,9 @@ struct BottomBar: View {
                 Spacer()
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(AppTheme.sidebarBackground)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 10)
+        .background(AppTheme.workspace)
         .onAppear { setupTimeObserver() }
         .onDisappear { removeTimeObserver() }
         .onChange(of: viewModel.player) {
