@@ -24,19 +24,9 @@ struct TranscriptToolbar: View {
     @ObservedObject var viewModel: TranscriptViewModel
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Import button
-            Button(action: { openFilePicker() }) {
-                Image(systemName: "plus.circle")
-                    .font(.system(size: 16))
-                    .foregroundColor(AppTheme.textSecondary)
-            }
-            .buttonStyle(.plain)
-            .help("导入音频/视频文件")
-
+        HStack(spacing: 10) {
             Spacer()
 
-            // Search field
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
@@ -59,9 +49,25 @@ struct TranscriptToolbar: View {
             .background(AppTheme.surface)
             .cornerRadius(AppTheme.cornerRadiusSmall)
             .frame(width: 200)
+
+            Button(action: { openFilePicker() }) {
+                Image(systemName: "plus")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary)
+                    .frame(width: 30, height: 30)
+                    .background(AppTheme.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AppTheme.cornerRadiusSmall)
+                            .stroke(AppTheme.border, lineWidth: 1)
+                    )
+                    .cornerRadius(AppTheme.cornerRadiusSmall)
+            }
+            .buttonStyle(.plain)
+            .help("导入音频/视频文件")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 28)
+        .padding(.top, 4)
+        .padding(.bottom, 10)
         .background(AppTheme.workspace)
     }
 
@@ -235,19 +241,24 @@ struct TranscriptLine: View, Equatable {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Button(action: onToggle) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 13))
                     .foregroundColor(isSelected ? AppTheme.accent : AppTheme.textTertiary)
+                    .frame(width: 14, height: 14)
             }
             .buttonStyle(.plain)
+            .alignmentGuide(.firstTextBaseline) { dimension in
+                dimension[VerticalAlignment.center] + 4
+            }
 
             Text(segment.displayTimestamp)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(isActive ? AppTheme.textPrimary : AppTheme.accent)
                 .padding(.horizontal, isActive ? 6 : 0)
                 .padding(.vertical, isActive ? 2 : 0)
+                .frame(width: 48, alignment: .leading)
                 .background(isActive ? AppTheme.accentWarm.opacity(0.75) : Color.clear)
                 .cornerRadius(AppTheme.cornerRadiusSmall)
                 .onTapGesture { onSeek?(segment.startTime) }
