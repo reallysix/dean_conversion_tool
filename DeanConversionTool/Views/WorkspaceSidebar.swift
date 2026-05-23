@@ -4,19 +4,15 @@ import UniformTypeIdentifiers
 
 struct WorkspaceSidebar: View {
     @ObservedObject var viewModel: TranscriptViewModel
-    @Binding var selectedPanel: SidePanel
+    let onOpenSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             brandHeader
 
             VStack(spacing: 8) {
-                SidebarActionButton(icon: "doc.text", title: "转写工作台", isSelected: selectedPanel == .transcript) {
-                    selectedPanel = .transcript
-                }
-                SidebarActionButton(icon: "gearshape", title: "设置", isSelected: selectedPanel == .settings) {
-                    selectedPanel = .settings
-                }
+                SidebarActionButton(icon: "doc.text", title: "转写工作台", isSelected: true) {}
+                SidebarActionButton(icon: "gearshape", title: "设置", isSelected: false, action: onOpenSettings)
             }
             .padding(.horizontal, 18)
             .padding(.bottom, 18)
@@ -105,7 +101,6 @@ struct WorkspaceSidebar: View {
                                 project: project,
                                 isSelected: viewModel.selectedProjectID == project.id
                             ) {
-                                selectedPanel = .transcript
                                 viewModel.openProject(project)
                             }
                         }
@@ -127,7 +122,6 @@ struct WorkspaceSidebar: View {
         panel.canChooseDirectories = false
 
         if panel.runModal() == .OK, let url = panel.url {
-            selectedPanel = .transcript
             viewModel.processFile(url: url)
         }
     }
@@ -143,7 +137,6 @@ struct WorkspaceSidebar: View {
         panel.canChooseDirectories = false
 
         if panel.runModal() == .OK, !panel.urls.isEmpty {
-            selectedPanel = .transcript
             viewModel.batchQueue = panel.urls
             viewModel.showBatchSetup = true
         }
@@ -162,9 +155,9 @@ struct WorkspaceSidebar: View {
 
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let urlString = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        selectedPanel = .transcript
         viewModel.processOnlineVideo(urlString: urlString)
     }
+
 }
 
 private struct SidebarActionButton: View {

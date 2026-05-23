@@ -25,6 +25,7 @@ struct DeanConversionToolApp: App {
         Settings {
             SettingsView()
         }
+        .defaultSize(width: 920, height: 620)
         #endif
     }
 }

@@ -3,13 +3,15 @@ import AppKit
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    @Environment(\.openSettings) private var openSettings
     @StateObject private var viewModel = TranscriptViewModel()
     @State private var isDragOver = false
-    @State private var selectedPanel: SidePanel = .transcript
 
     var body: some View {
         HStack(spacing: 0) {
-            WorkspaceSidebar(viewModel: viewModel, selectedPanel: $selectedPanel)
+            WorkspaceSidebar(viewModel: viewModel) {
+                openSettings()
+            }
 
             Rectangle()
                 .fill(AppTheme.border)
@@ -17,17 +19,9 @@ struct ContentView: View {
 
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
-                    ZStack {
-                        TranscriptContainerView(viewModel: viewModel)
-                            .opacity(selectedPanel == .transcript ? 1 : 0)
-                            .allowsHitTesting(selectedPanel == .transcript)
-
-                        EmbeddedSettingsView()
-                            .opacity(selectedPanel == .settings ? 1 : 0)
-                            .allowsHitTesting(selectedPanel == .settings)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
+                    TranscriptContainerView(viewModel: viewModel)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
 
                     Rectangle()
                         .fill(AppTheme.border)
@@ -232,27 +226,6 @@ struct HeaderMetric: View {
                 .foregroundColor(AppTheme.textTertiary)
         }
         .frame(width: 70, alignment: .leading)
-    }
-}
-
-// MARK: - Embedded Settings
-
-struct EmbeddedSettingsView: View {
-    var body: some View {
-        VStack(spacing: 0) {
-            Text("设置")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(AppTheme.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .padding(.bottom, 16)
-
-            SettingsView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.horizontal, 24)
-        }
-        .background(AppTheme.background)
     }
 }
 
