@@ -179,9 +179,11 @@ private struct SidebarActionButton: View {
             }
             .foregroundColor(isSelected ? .white : AppTheme.textSecondary)
             .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 38)
             .background(isSelected ? AppTheme.textPrimary : Color.clear)
             .cornerRadius(AppTheme.cornerRadiusMedium)
+            .contentShape(Rectangle())
         }
         .buttonStyle(WorkbenchPlainButtonStyle())
     }

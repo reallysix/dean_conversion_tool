@@ -127,9 +127,11 @@ private struct SettingsSidebarRow: View {
             }
             .foregroundColor(isSelected ? AppTheme.textPrimary : AppTheme.textSecondary)
             .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 48)
             .background(isSelected ? AppTheme.surfaceHover : Color.clear)
             .cornerRadius(AppTheme.cornerRadiusMedium)
+            .contentShape(Rectangle())
         }
         .buttonStyle(WorkbenchPlainButtonStyle())
     }

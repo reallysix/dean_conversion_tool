@@ -3,14 +3,13 @@ import AppKit
 import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @Environment(\.openSettings) private var openSettings
     @StateObject private var viewModel = TranscriptViewModel()
     @State private var isDragOver = false
 
     var body: some View {
         HStack(spacing: 0) {
             WorkspaceSidebar(viewModel: viewModel) {
-                openSettings()
+                SettingsWindowController.shared.show(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
             }
 
             Rectangle()

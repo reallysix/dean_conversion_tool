@@ -20,13 +20,6 @@ struct DeanConversionToolApp: App {
                 .keyboardShortcut("i", modifiers: [.command, .shift])
             }
         }
-
-        #if os(macOS)
-        Settings {
-            SettingsView()
-        }
-        .defaultSize(width: 920, height: 620)
-        #endif
     }
 }
 
