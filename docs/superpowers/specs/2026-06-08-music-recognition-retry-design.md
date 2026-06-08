@@ -1,75 +1,79 @@
-# Background Music Recognition Retry Design
+# 背景音乐重新识别设计
 
-## Goal
+## 目标
 
-Make missing iFlytek credentials and retryable music-recognition failures easy to recover from without rerunning transcription or creating duplicate projects.
+当用户未配置科大讯飞凭据，或者背景音乐识别失败时，提供简单、明确的恢复入口，同时避免重新执行字幕转写或创建重复项目。
 
-## Confirmed Behavior
+## 已确认行为
 
-- Saving iFlytek credentials only saves configuration. It does not automatically start recognition or consume quota.
-- The user explicitly starts another attempt with `重新识别`.
-- A retry reuses the existing transcript and its time segments.
-- A retry does not invoke Whisper or speaker diarization.
-- A retry does not create another history project or duplicate transcript outputs.
-- The updated music result replaces the current project's existing `music-analysis.json`.
+- 保存科大讯飞凭据时只保存配置，不自动开始识别，也不消耗调用额度。
+- 用户通过点击“重新识别”主动发起新的识别任务。
+- 重新识别复用现有字幕及其时间片段。
+- 重新识别不调用 Whisper，也不重新执行说话人识别。
+- 重新识别不创建新的历史项目，不生成重复字幕文件。
+- 新的音乐识别结果覆盖当前项目原有的 `music-analysis.json`。
 
-## Result States
+## 结果状态
 
-The background-music panel distinguishes these states:
+背景音乐面板区分以下状态：
 
-1. **Credentials not configured**
-   - Message: `尚未配置讯飞识曲凭据`
-   - Primary action: `立即设置`
-   - Secondary action: `重新识别`
-   - `立即设置` opens the existing Settings window directly at the background-music credential section.
-   - `重新识别` checks credentials before downloading audio. If credentials are still missing, it keeps the current result and opens the settings path instead of starting work.
+### 1. 未配置凭据
 
-2. **Recognition completed with no match**
-   - Message: `暂未识别到歌曲`
-   - Action: `重新识别`
-   - The unmatched sample count is shown only when samples were actually submitted.
+- 提示：`尚未配置讯飞识曲凭据`
+- 主要操作：`立即设置`
+- 次要操作：`重新识别`
+- 点击“立即设置”后，直接打开现有设置窗口中的背景音乐凭据区域。
+- 点击“重新识别”时，先检查凭据，不提前下载音频。如果凭据仍未配置，则保留当前结果并引导用户进入设置，不启动识别任务。
 
-3. **Recognition failed**
-   - Message contains the actionable provider, download, or sample-extraction error.
-   - Action: `重新识别`
-   - Successful tracks from a partial run remain visible.
+### 2. 识别完成但没有匹配结果
 
-4. **Recognition succeeded**
-   - Existing track rows, provider details, unmatched count, and export actions remain.
-   - Action: `重新识别` is available for an intentional refresh.
+- 提示：`暂未识别到歌曲`
+- 操作：`重新识别`
+- 只有在音频样本确实提交给识别服务后，才显示“未命中样本”数量。
 
-## Retry Data Flow
+### 3. 识别失败
 
-1. Resolve the current online video's original URL from the loaded transcript/history project.
-2. Verify complete iFlytek credentials before any download.
-3. Download a temporary audio copy using the existing `yt-dlp` and cookie-source settings.
-4. Run `MusicAnalysisService` with the existing transcript duration and segments.
-5. Replace the in-memory music result.
-6. Atomically overwrite the current project's music-analysis output and update project metadata.
-7. Remove the temporary download.
+- 提示具体可操作的错误，包括识别服务、音频下载或样本提取错误。
+- 操作：`重新识别`
+- 如果部分样本已经成功识别，继续保留并显示已有歌曲结果。
 
-The app continues to store only the source URL, transcript outputs, and music-analysis result. It does not retain copied online audio.
+### 4. 识别成功
 
-## UI And Progress
+- 保留现有歌曲列表、识别服务、未命中数量和导出操作。
+- 提供“重新识别”，供用户主动刷新结果。
 
-- Music retry has its own busy state so the transcript stays visible and usable.
-- While retrying, the action shows recognition progress and cannot be started twice.
-- General task status must not imply that the transcript is running again.
-- Opening Settings does not discard the loaded project or its transcript.
+## 重新识别流程
 
-## Persistence
+1. 从当前字幕或历史项目中取得在线视频原始链接。
+2. 在下载音频之前检查科大讯飞凭据是否完整。
+3. 使用现有 `yt-dlp` 和 Cookie 来源设置，临时下载音频。
+4. 使用现有字幕时长和字幕片段运行 `MusicAnalysisService`。
+5. 替换内存中的背景音乐结果。
+6. 原子覆盖当前项目的音乐分析文件，并更新 `project.json`。
+7. 删除临时下载的音频。
 
-`MusicAnalysis` records a machine-readable outcome so the UI does not infer state from localized warning text. Decoding remains compatible with existing archived music-analysis files.
+应用继续只保存来源链接、字幕文件和音乐分析结果，不保存在线视频的音频副本。
 
-`HistoryProjectStore` gains an update operation that writes the music result into the existing project directory and updates `project.json`; it never calls the create-project path.
+## 界面与进度
 
-## Verification
+- 背景音乐重新识别使用独立的忙碌状态，字幕内容保持可见和可用。
+- 识别过程中显示音乐识别进度，并禁止重复启动。
+- 主任务状态不得让用户误以为字幕正在重新转写。
+- 打开设置窗口不会清除当前项目或字幕。
 
-- Missing credentials produce the configuration state rather than `未命中样本`.
-- Clicking `立即设置` opens Settings at background-music configuration.
-- Saving credentials performs no recognition request.
-- Retrying calls the music path but not Whisper or diarization.
-- Retrying overwrites the same project's result and leaves the project count unchanged.
-- Download/provider failures leave the transcript and previous usable tracks intact.
-- Existing history files without the new outcome field still load.
-- Unit tests and the macOS Debug build pass.
+## 数据保存
+
+`MusicAnalysis` 增加机器可读的结果状态，界面不再通过解析本地化的警告文字判断状态。读取逻辑需要兼容已有的历史音乐分析文件。
+
+`HistoryProjectStore` 增加更新音乐结果的方法，将结果写入现有项目目录并更新 `project.json`，不能调用创建新项目的流程。
+
+## 验收标准
+
+- 未配置凭据时显示配置引导，不显示“未命中样本”。
+- 点击“立即设置”可以直接打开背景音乐配置区域。
+- 保存凭据不会自动发起识别请求。
+- 点击“重新识别”只执行音乐识别流程，不调用 Whisper 或说话人识别。
+- 重新识别覆盖同一项目的结果，历史项目数量保持不变。
+- 下载或识别服务失败时，字幕和之前可用的歌曲结果保持不变。
+- 没有新增结果状态字段的旧历史文件仍能正常读取。
+- 单元测试和 macOS Debug 构建通过。
