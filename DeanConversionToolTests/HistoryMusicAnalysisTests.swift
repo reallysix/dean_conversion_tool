@@ -100,6 +100,36 @@ final class HistoryMusicAnalysisTests: XCTestCase {
         )
     }
 
+    func testUpdatesMusicAnalysisWithoutCreatingAnotherProject() throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = HistoryProjectStore(
+            fileManager: .default,
+            projectsRootURL: root
+        )
+        let transcript = Transcript(
+            sourceURL: URL(string: "https://example.com/video")!,
+            sourceTitle: "Video",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            segments: [
+                TranscriptSegment(startTime: 0, endTime: 1, text: "hello"),
+            ],
+            duration: 60
+        )
+        let project = try store.saveTranscriptProject(
+            transcript: transcript,
+            sourceType: .onlineVideo
+        )
+        let expected = analysis()
+
+        let updated = try store.updateMusicAnalysis(expected, for: project)
+
+        XCTAssertEqual(try store.loadProjects().count, 1)
+        XCTAssertEqual(updated.id, project.id)
+        XCTAssertEqual(updated.outputs.musicAnalysisJSON, "music-analysis.json")
+        XCTAssertEqual(try store.loadMusicAnalysis(for: updated), expected)
+    }
+
     private func temporaryDirectory() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent(
             "history-music-test-\(UUID().uuidString)",

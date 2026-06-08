@@ -138,6 +138,23 @@ final class HistoryProjectStore {
         return try decoder.decode(MusicAnalysis.self, from: data)
     }
 
+    func updateMusicAnalysis(
+        _ analysis: MusicAnalysis,
+        for project: HistoryProject
+    ) throws -> HistoryProject {
+        let fileName = "music-analysis.json"
+        try writeMusicAnalysis(
+            analysis,
+            to: project.projectURL.appendingPathComponent(fileName)
+        )
+
+        var updated = project
+        updated.outputs.musicAnalysisJSON = fileName
+        updated.updatedAt = Date()
+        try writeProjectMetadata(updated)
+        return updated
+    }
+
     private func writeProjectMetadata(_ project: HistoryProject) throws {
         let metadataURL = project.projectURL.appendingPathComponent("project.json")
         let encoder = JSONEncoder()
