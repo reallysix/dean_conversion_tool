@@ -188,6 +188,18 @@ class TranscriptViewModel: ObservableObject {
         return whisperService.isModelLoaded
     }
 
+    var canRecognizeMusicForCurrentTranscript: Bool {
+        guard let transcript else { return false }
+        return !transcript.sourceURL.isFileURL
+    }
+
+    var manualMusicRecognitionMode: MusicScanMode {
+        if let analysisMode = musicAnalysis?.scanMode, analysisMode != .off {
+            return analysisMode
+        }
+        return musicScanMode == .off ? .quick : musicScanMode
+    }
+
     var isWhisperCLIAvailable: Bool {
         return whisperService.isCLIAvailable
     }
@@ -346,6 +358,7 @@ class TranscriptViewModel: ObservableObject {
         error = nil
         lastFailedOnlineVideoURLString = nil
         transcript = nil
+        resetTranscriptNavigationState()
         resetMusicAnalysis()
         progress = 0.0
         playbackCurrentTime = 0
@@ -404,6 +417,7 @@ class TranscriptViewModel: ObservableObject {
         error = nil
         lastFailedOnlineVideoURLString = nil
         transcript = nil
+        resetTranscriptNavigationState()
         resetMusicAnalysis()
         player = nil
         isVideoFile = false
@@ -742,12 +756,8 @@ class TranscriptViewModel: ObservableObject {
             lastExportedMusicFileURL = nil
             selectedProjectID = project.id
             error = nil
-            searchText = ""
             playbackCurrentTime = 0
-            selectionManager.deselectAll()
-            cachedSegments = []
-            cachedTranscriptID = nil
-            cachedSearchText = nil
+            resetTranscriptNavigationState()
 
             let videoExtensions = ["mp4", "mov", "avi", "mkv", "webm", "m4v"]
             let sourceURL = archivedTranscript.sourceURL
@@ -829,8 +839,7 @@ class TranscriptViewModel: ObservableObject {
             return
         }
 
-        let mode = musicAnalysis?.scanMode ?? musicScanMode
-        guard mode != .off else { return }
+        let mode = manualMusicRecognitionMode
 
         isRetryingMusicRecognition = true
         musicAnalysisMessage = nil
@@ -1050,6 +1059,14 @@ class TranscriptViewModel: ObservableObject {
         lastExportedMusicFileURL = nil
         isRetryingMusicRecognition = false
         musicRecognitionProgressMessage = nil
+    }
+
+    func resetTranscriptNavigationState() {
+        searchText = ""
+        selectionManager.deselectAll()
+        cachedSegments = []
+        cachedTranscriptID = nil
+        cachedSearchText = nil
     }
 
     private func validateRequiredSetup(includeOnlineVideo: Bool) -> Bool {
@@ -1299,10 +1316,7 @@ class TranscriptViewModel: ObservableObject {
         transcript = nil
         resetMusicAnalysis()
         selectedProjectID = nil
-        selectionManager.deselectAll()
-        cachedSegments = []
-        cachedTranscriptID = nil
-        cachedSearchText = nil
+        resetTranscriptNavigationState()
         error = nil
         lastFailedOnlineVideoURLString = nil
         onlinePreviewError = nil

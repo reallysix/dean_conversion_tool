@@ -104,6 +104,34 @@ struct PropertiesPanel: View {
                                 )
                             }
                         }
+                    } else if viewModel.canRecognizeMusicForCurrentTranscript {
+                        PropertiesSection(title: "背景音乐") {
+                            Text("尚未识别背景音乐")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppTheme.textTertiary)
+                                .padding(.vertical, 4)
+
+                            if let progressMessage = viewModel.musicRecognitionProgressMessage {
+                                MusicAnalysisStatusView(
+                                    message: progressMessage,
+                                    isError: false
+                                )
+                            } else if let message = viewModel.musicAnalysisMessage {
+                                MusicAnalysisStatusView(
+                                    message: message,
+                                    isError: viewModel.musicAnalysisIsError
+                                )
+                            }
+
+                            PropertyButton(
+                                title: viewModel.isRetryingMusicRecognition
+                                    ? "正在识别..."
+                                    : "立即识别",
+                                isDisabled: viewModel.isRetryingMusicRecognition
+                            ) {
+                                viewModel.retryMusicRecognition()
+                            }
+                        }
                     }
 
                     PropertiesSection(title: "说话人") {
