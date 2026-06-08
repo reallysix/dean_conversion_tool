@@ -53,4 +53,23 @@ final class MusicAnalysisModelTests: XCTestCase {
         XCTAssertEqual(analysis.outcome, .completed)
         XCTAssertEqual(analysis.submittedSampleCount, 0)
     }
+
+    func testOldMissingCredentialsWarningRestoresNotConfiguredOutcome() throws {
+        let data = """
+        {
+          "sourceURL": "https://example.com/video",
+          "createdAt": "2026-06-08T08:00:00Z",
+          "scanMode": "quick",
+          "tracks": [],
+          "unmatchedSampleCount": 0,
+          "warning": "未配置讯飞音乐识别凭据，仅保留平台标注结果"
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let analysis = try decoder.decode(MusicAnalysis.self, from: data)
+
+        XCTAssertEqual(analysis.outcome, .notConfigured)
+    }
 }

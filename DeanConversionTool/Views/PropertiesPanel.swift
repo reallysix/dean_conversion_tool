@@ -25,7 +25,8 @@ struct PropertiesPanel: View {
 
                     if let analysis = viewModel.musicAnalysis {
                         PropertiesSection(title: "背景音乐") {
-                            if analysis.tracks.isEmpty {
+                            if analysis.outcome != .notConfigured,
+                               analysis.tracks.isEmpty {
                                 Text("暂未识别到歌曲")
                                     .font(.system(size: 11))
                                     .foregroundColor(AppTheme.textTertiary)
@@ -36,16 +37,23 @@ struct PropertiesPanel: View {
                                 }
                             }
 
-                            PropertyRow(
-                                label: "未命中样本",
-                                value: "\(analysis.unmatchedSampleCount)"
-                            )
+                            if analysis.submittedSampleCount > 0 {
+                                PropertyRow(
+                                    label: "未命中样本",
+                                    value: "\(analysis.unmatchedSampleCount)"
+                                )
+                            }
 
                             if let providerName = analysis.providerName {
                                 PropertyRow(label: "识别服务", value: providerName)
                             }
 
-                            if viewModel.lastExportedMusicFileURL == nil,
+                            if let progressMessage = viewModel.musicRecognitionProgressMessage {
+                                MusicAnalysisStatusView(
+                                    message: progressMessage,
+                                    isError: false
+                                )
+                            } else if viewModel.lastExportedMusicFileURL == nil,
                                let message = viewModel.musicAnalysisMessage {
                                 MusicAnalysisStatusView(
                                     message: message,
@@ -56,6 +64,25 @@ struct PropertiesPanel: View {
                                     message: warning,
                                     isError: true
                                 )
+                            }
+
+                            if !transcript.sourceURL.isFileURL,
+                               analysis.scanMode != .off {
+                                HStack(spacing: 8) {
+                                    if analysis.outcome == .notConfigured {
+                                        PropertyButton(title: "立即设置") {
+                                            viewModel.openMusicRecognitionSettings()
+                                        }
+                                    }
+                                    PropertyButton(
+                                        title: viewModel.isRetryingMusicRecognition
+                                            ? "正在识别..."
+                                            : "重新识别",
+                                        isDisabled: viewModel.isRetryingMusicRecognition
+                                    ) {
+                                        viewModel.retryMusicRecognition()
+                                    }
+                                }
                             }
 
                             HStack(spacing: 8) {
@@ -542,6 +569,7 @@ struct PropertyRow: View {
 
 struct PropertyButton: View {
     let title: String
+    var isDisabled = false
     let action: () -> Void
 
     var body: some View {
@@ -556,6 +584,8 @@ struct PropertyButton: View {
                 .cornerRadius(AppTheme.cornerRadiusSmall)
         }
         .buttonStyle(WorkbenchPlainButtonStyle())
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.55 : 1)
     }
 }
 

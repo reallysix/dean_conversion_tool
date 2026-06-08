@@ -121,10 +121,16 @@ struct MusicAnalysis: Codable, Equatable {
         unmatchedSampleCount = try container.decode(Int.self, forKey: .unmatchedSampleCount)
         providerName = try container.decodeIfPresent(String.self, forKey: .providerName)
         warning = try container.decodeIfPresent(String.self, forKey: .warning)
-        outcome = try container.decodeIfPresent(
+        if let decodedOutcome = try container.decodeIfPresent(
             MusicAnalysisOutcome.self,
             forKey: .outcome
-        ) ?? .completed
+        ) {
+            outcome = decodedOutcome
+        } else if warning?.contains("未配置讯飞音乐识别凭据") == true {
+            outcome = .notConfigured
+        } else {
+            outcome = .completed
+        }
         submittedSampleCount = try container.decodeIfPresent(
             Int.self,
             forKey: .submittedSampleCount

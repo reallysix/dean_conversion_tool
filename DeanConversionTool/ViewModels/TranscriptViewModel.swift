@@ -79,6 +79,8 @@ class TranscriptViewModel: ObservableObject {
     @Published var musicAnalysisMessage: String?
     @Published var musicAnalysisIsError = false
     @Published var lastExportedMusicFileURL: URL?
+    @Published var isRetryingMusicRecognition = false
+    @Published var musicRecognitionProgressMessage: String?
 
     // Selection is managed separately to avoid re-renders
     let selectionManager = SelectionManager()
@@ -141,6 +143,7 @@ class TranscriptViewModel: ObservableObject {
     private let credentialStore: XFYunCredentialStoring = KeychainXFYunCredentialStore()
     private let musicSampleService = MusicSampleService()
     private let musicExportService = MusicExportService()
+    private let musicRetryService = MusicRecognitionRetryService()
 
     // MARK: - State
     private var tempWavPath: String?
@@ -721,8 +724,12 @@ class TranscriptViewModel: ObservableObject {
             let archivedTranscript = try historyStore.loadTranscript(for: project)
             transcript = archivedTranscript
             musicAnalysis = try historyStore.loadMusicAnalysis(for: project)
-            musicAnalysisMessage = musicAnalysis?.warning
-            musicAnalysisIsError = musicAnalysis?.warning != nil
+            if let musicAnalysis {
+                applyMusicAnalysisStatus(musicAnalysis)
+            } else {
+                musicAnalysisMessage = nil
+                musicAnalysisIsError = false
+            }
             lastExportedMusicFileURL = nil
             selectedProjectID = project.id
             error = nil
@@ -799,6 +806,73 @@ class TranscriptViewModel: ObservableObject {
         processOnlineVideo(urlString: lastFailedOnlineVideoURLString)
     }
 
+    func openMusicRecognitionSettings() {
+        SettingsWindowController.shared.show(
+            destination: .musicRecognition,
+            relativeTo: NSApp.keyWindow ?? NSApp.mainWindow
+        )
+    }
+
+    func retryMusicRecognition() {
+        guard !isRetryingMusicRecognition,
+              let transcript,
+              !transcript.sourceURL.isFileURL else {
+            return
+        }
+
+        let mode = musicAnalysis?.scanMode ?? musicScanMode
+        guard mode != .off else { return }
+
+        isRetryingMusicRecognition = true
+        musicAnalysisMessage = nil
+        musicAnalysisIsError = false
+        lastExportedMusicFileURL = nil
+        musicRecognitionProgressMessage = "正在下载音频..."
+
+        Task {
+            defer {
+                isRetryingMusicRecognition = false
+                musicRecognitionProgressMessage = nil
+            }
+
+            do {
+                let result = try await musicRetryService.retry(
+                    sourceURL: transcript.sourceURL,
+                    transcript: transcript,
+                    mode: mode,
+                    cookieSource: onlineVideoCookieSource
+                ) { completed, total in
+                    Task { @MainActor in
+                        self.musicRecognitionProgressMessage =
+                            "正在识别背景音乐 \(completed)/\(total)..."
+                    }
+                }
+                let analysis = result.outcome == .failed
+                    ? musicAnalysisByPreservingTracks(from: result)
+                    : result
+
+                musicAnalysis = analysis
+                try updateCurrentProjectMusicAnalysis(analysis)
+                applyMusicAnalysisStatus(analysis)
+            } catch MusicRecognitionRetryError.missingCredentials {
+                musicAnalysisMessage = "尚未配置讯飞识曲凭据"
+                musicAnalysisIsError = true
+                openMusicRecognitionSettings()
+            } catch {
+                let message = "背景音乐重新识别失败：\(error.localizedDescription)"
+                let analysis = failedMusicAnalysis(
+                    message: message,
+                    transcript: transcript,
+                    mode: mode
+                )
+                musicAnalysis = analysis
+                try? updateCurrentProjectMusicAnalysis(analysis)
+                musicAnalysisMessage = message
+                musicAnalysisIsError = true
+            }
+        }
+    }
+
     private func archiveTranscript(
         _ transcript: Transcript,
         sourceType: ProjectSourceType,
@@ -869,17 +943,86 @@ class TranscriptViewModel: ObservableObject {
             }
         }
 
-        let warning = credentialWarning ?? analysis.warning
-        if let warning {
-            musicAnalysisMessage = "文稿已完成，但背景音乐识别失败：\(warning)"
+        if let credentialWarning {
+            musicAnalysisMessage = "文稿已完成，但背景音乐识别失败：\(credentialWarning)"
             musicAnalysisIsError = true
         } else {
+            applyMusicAnalysisStatus(analysis)
+        }
+        return analysis
+    }
+
+    private func applyMusicAnalysisStatus(_ analysis: MusicAnalysis) {
+        switch analysis.outcome {
+        case .notConfigured:
+            musicAnalysisMessage = "尚未配置讯飞识曲凭据"
+            musicAnalysisIsError = true
+        case .completed:
             musicAnalysisMessage = analysis.tracks.isEmpty
                 ? "背景音乐扫描完成，暂未识别到歌曲"
                 : "已识别 \(analysis.tracks.count) 首背景音乐"
             musicAnalysisIsError = false
+        case .partialFailure:
+            musicAnalysisMessage = analysis.warning ?? "部分音乐样本识别失败"
+            musicAnalysisIsError = true
+        case .failed:
+            musicAnalysisMessage = analysis.warning ?? "背景音乐识别失败"
+            musicAnalysisIsError = true
         }
-        return analysis
+    }
+
+    private func musicAnalysisByPreservingTracks(
+        from failedAnalysis: MusicAnalysis
+    ) -> MusicAnalysis {
+        let previousTracks = musicAnalysis?.tracks ?? []
+        guard !previousTracks.isEmpty else {
+            return failedAnalysis
+        }
+
+        return MusicAnalysis(
+            sourceURL: failedAnalysis.sourceURL,
+            createdAt: failedAnalysis.createdAt,
+            scanMode: failedAnalysis.scanMode,
+            tracks: previousTracks,
+            unmatchedSampleCount: failedAnalysis.unmatchedSampleCount,
+            providerName: failedAnalysis.providerName,
+            warning: failedAnalysis.warning,
+            outcome: .failed,
+            submittedSampleCount: failedAnalysis.submittedSampleCount
+        )
+    }
+
+    private func failedMusicAnalysis(
+        message: String,
+        transcript: Transcript,
+        mode: MusicScanMode
+    ) -> MusicAnalysis {
+        MusicAnalysis(
+            sourceURL: transcript.sourceURL,
+            createdAt: Date(),
+            scanMode: mode,
+            tracks: musicAnalysis?.tracks ?? [],
+            unmatchedSampleCount: 0,
+            providerName: musicAnalysis?.providerName,
+            warning: message,
+            outcome: .failed,
+            submittedSampleCount: 0
+        )
+    }
+
+    private func updateCurrentProjectMusicAnalysis(
+        _ analysis: MusicAnalysis
+    ) throws {
+        guard let project = selectedHistoryProject else { return }
+
+        let updated = try historyStore.updateMusicAnalysis(
+            analysis,
+            for: project
+        )
+        historyProjects.removeAll { $0.id == updated.id }
+        historyProjects.append(updated)
+        historyProjects.sort { $0.updatedAt > $1.updatedAt }
+        selectedProjectID = updated.id
     }
 
     private func resetMusicAnalysis() {
@@ -887,6 +1030,8 @@ class TranscriptViewModel: ObservableObject {
         musicAnalysisMessage = nil
         musicAnalysisIsError = false
         lastExportedMusicFileURL = nil
+        isRetryingMusicRecognition = false
+        musicRecognitionProgressMessage = nil
     }
 
     private func validateRequiredSetup(includeOnlineVideo: Bool) -> Bool {
