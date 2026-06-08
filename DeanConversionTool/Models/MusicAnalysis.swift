@@ -67,6 +67,12 @@ enum MusicAnalysisOutcome: String, Codable, Equatable {
     case failed
 }
 
+struct MusicAnalysisPresentation: Equatable {
+    let message: String
+    let isError: Bool
+    let shouldShowSettings: Bool
+}
+
 struct MusicAnalysis: Codable, Equatable {
     let sourceURL: URL
     let createdAt: Date
@@ -148,6 +154,45 @@ struct MusicAnalysis: Codable, Equatable {
         try container.encodeIfPresent(warning, forKey: .warning)
         try container.encode(outcome, forKey: .outcome)
         try container.encode(submittedSampleCount, forKey: .submittedSampleCount)
+    }
+
+    func presentation(
+        credentialsConfigured: Bool
+    ) -> MusicAnalysisPresentation {
+        switch outcome {
+        case .notConfigured where credentialsConfigured:
+            return MusicAnalysisPresentation(
+                message: "讯飞识曲凭据已配置，请点击重新识别",
+                isError: false,
+                shouldShowSettings: false
+            )
+        case .notConfigured:
+            return MusicAnalysisPresentation(
+                message: "尚未配置讯飞识曲凭据",
+                isError: true,
+                shouldShowSettings: true
+            )
+        case .completed:
+            return MusicAnalysisPresentation(
+                message: tracks.isEmpty
+                    ? "背景音乐扫描完成，暂未识别到歌曲"
+                    : "已识别 \(tracks.count) 首背景音乐",
+                isError: false,
+                shouldShowSettings: false
+            )
+        case .partialFailure:
+            return MusicAnalysisPresentation(
+                message: warning ?? "部分音乐样本识别失败",
+                isError: true,
+                shouldShowSettings: false
+            )
+        case .failed:
+            return MusicAnalysisPresentation(
+                message: warning ?? "背景音乐识别失败",
+                isError: true,
+                shouldShowSettings: false
+            )
+        }
     }
 }
 

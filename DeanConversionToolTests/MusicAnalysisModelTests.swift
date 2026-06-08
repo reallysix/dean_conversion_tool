@@ -72,4 +72,29 @@ final class MusicAnalysisModelTests: XCTestCase {
 
         XCTAssertEqual(analysis.outcome, .notConfigured)
     }
+
+    func testConfiguredCredentialsOverrideStaleNotConfiguredPresentation() {
+        let analysis = MusicAnalysis(
+            sourceURL: URL(string: "https://example.com/video")!,
+            createdAt: Date(),
+            scanMode: .quick,
+            tracks: [],
+            unmatchedSampleCount: 0,
+            providerName: nil,
+            warning: "未配置讯飞音乐识别凭据，仅保留平台标注结果",
+            outcome: .notConfigured,
+            submittedSampleCount: 0
+        )
+
+        let presentation = analysis.presentation(
+            credentialsConfigured: true
+        )
+
+        XCTAssertEqual(
+            presentation.message,
+            "讯飞识曲凭据已配置，请点击重新识别"
+        )
+        XCTAssertFalse(presentation.isError)
+        XCTAssertFalse(presentation.shouldShowSettings)
+    }
 }

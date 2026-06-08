@@ -1,6 +1,12 @@
 import Foundation
 import Security
 
+extension Notification.Name {
+    static let xfyunCredentialsDidChange = Notification.Name(
+        "xfyunCredentialsDidChange"
+    )
+}
+
 struct XFYunCredentials: Codable, Equatable {
     let appID: String
     let apiKey: String

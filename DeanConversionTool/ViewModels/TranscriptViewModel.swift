@@ -81,6 +81,7 @@ class TranscriptViewModel: ObservableObject {
     @Published var lastExportedMusicFileURL: URL?
     @Published var isRetryingMusicRecognition = false
     @Published var musicRecognitionProgressMessage: String?
+    @Published private(set) var musicCredentialsAreConfigured = false
 
     // Selection is managed separately to avoid re-renders
     let selectionManager = SelectionManager()
@@ -131,6 +132,7 @@ class TranscriptViewModel: ObservableObject {
     private var cachedSegments: [TranscriptSegment] = []
     private var cachedSearchText: String?
     private var cachedTranscriptID: UUID?
+    private var cancellables: Set<AnyCancellable> = []
 
     // MARK: - Services
     private let whisperService = WhisperService()
@@ -324,6 +326,12 @@ class TranscriptViewModel: ObservableObject {
     // MARK: - Initialization
     init() {
         // Model loading happens in WhisperService via whisper-cli subprocess
+        refreshMusicCredentialStatus()
+        NotificationCenter.default.publisher(for: .xfyunCredentialsDidChange)
+            .sink { [weak self] _ in
+                self?.refreshMusicCredentialStatus()
+            }
+            .store(in: &cancellables)
         loadHistoryProjects()
     }
 
@@ -724,6 +732,7 @@ class TranscriptViewModel: ObservableObject {
             let archivedTranscript = try historyStore.loadTranscript(for: project)
             transcript = archivedTranscript
             musicAnalysis = try historyStore.loadMusicAnalysis(for: project)
+            refreshMusicCredentialStatus()
             if let musicAnalysis {
                 applyMusicAnalysisStatus(musicAnalysis)
             } else {
@@ -953,21 +962,30 @@ class TranscriptViewModel: ObservableObject {
     }
 
     private func applyMusicAnalysisStatus(_ analysis: MusicAnalysis) {
-        switch analysis.outcome {
-        case .notConfigured:
-            musicAnalysisMessage = "尚未配置讯飞识曲凭据"
-            musicAnalysisIsError = true
-        case .completed:
-            musicAnalysisMessage = analysis.tracks.isEmpty
-                ? "背景音乐扫描完成，暂未识别到歌曲"
-                : "已识别 \(analysis.tracks.count) 首背景音乐"
-            musicAnalysisIsError = false
-        case .partialFailure:
-            musicAnalysisMessage = analysis.warning ?? "部分音乐样本识别失败"
-            musicAnalysisIsError = true
-        case .failed:
-            musicAnalysisMessage = analysis.warning ?? "背景音乐识别失败"
-            musicAnalysisIsError = true
+        let presentation = analysis.presentation(
+            credentialsConfigured: musicCredentialsAreConfigured
+        )
+        musicAnalysisMessage = presentation.message
+        musicAnalysisIsError = presentation.isError
+    }
+
+    var shouldShowMusicRecognitionSettings: Bool {
+        guard let musicAnalysis else { return false }
+        return musicAnalysis.presentation(
+            credentialsConfigured: musicCredentialsAreConfigured
+        ).shouldShowSettings
+    }
+
+    private func refreshMusicCredentialStatus() {
+        do {
+            musicCredentialsAreConfigured =
+                try credentialStore.load()?.isComplete == true
+        } catch {
+            musicCredentialsAreConfigured = false
+        }
+
+        if let musicAnalysis {
+            applyMusicAnalysisStatus(musicAnalysis)
         }
     }
 

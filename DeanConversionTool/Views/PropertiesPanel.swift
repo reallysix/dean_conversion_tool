@@ -69,7 +69,7 @@ struct PropertiesPanel: View {
                             if !transcript.sourceURL.isFileURL,
                                analysis.scanMode != .off {
                                 HStack(spacing: 8) {
-                                    if analysis.outcome == .notConfigured {
+                                    if viewModel.shouldShowMusicRecognitionSettings {
                                         PropertyButton(title: "立即设置") {
                                             viewModel.openMusicRecognitionSettings()
                                         }
