@@ -45,6 +45,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Dean Conversion Tool
+        PRODUCT_MODULE_NAME: DeanConversionTool
         PRODUCT_BUNDLE_IDENTIFIER: com.dean.conversiontool
         INFOPLIST_FILE: DeanConversionTool/Info.plist
         CODE_SIGN_IDENTITY: ""
@@ -93,3 +94,30 @@ targets:
         NSHumanReadableCopyright: "Copyright © 2026 Dean. 保留所有权利。"
         NSMicrophoneUsageDescription: "语音转文字工具需要麦克风权限以进行音频转录。"
         NSScreenCaptureUsageDescription: "语音转文字工具需要屏幕录制权限以进行视频转录。"
+
+  DeanConversionToolTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: DeanConversionToolTests
+    dependencies:
+      - target: DeanConversionTool
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dean.conversiontool.tests
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Dean Conversion Tool.app/Contents/MacOS/Dean Conversion Tool"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+
+schemes:
+  DeanConversionTool:
+    build:
+      targets:
+        DeanConversionTool: all
+        DeanConversionToolTests: [test]
+    test:
+      targets:
+        - DeanConversionToolTests
