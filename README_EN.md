@@ -9,6 +9,7 @@ Audio/Video to Transcript Converter for macOS.
 - **Local Whisper transcription**: Transcribe audio and video locally through `whisper-cli` from whisper.cpp.
 - **Audio/video import**: Drag common audio and video files into the app or import them from the workstation.
 - **Online video transcription**: Paste public links supported by `yt-dlp`, such as YouTube, Bilibili, and Douyin links.
+- **Background music recognition**: Optionally run quick or deep scans for online videos, using platform music metadata first and iFlytek ACRCloud for short audio samples.
 - **Embedded video preview**: Play local videos and resolved online videos inside the app. The player keeps the full foreground frame and fills side bars with a blurred video background.
 - **Playback-linked transcript**: Click a timestamp or transcript segment to seek the video. During playback, the current subtitle segment is highlighted and the transcript follows the playhead.
 - **History archive**: Store transcript projects under `~/Documents/DeanConversionTool/Projects`, including generated transcript/subtitle files and source metadata without copying full media files.
@@ -57,6 +58,22 @@ You can also check local command-line dependencies with:
 Scripts/check_dependencies.sh
 ```
 
+### Background Music Recognition
+
+The first version uses iFlytek ACRCloud for personal, non-commercial testing. Create an iFlytek application with music recognition enabled, obtain its `APPID`, `APIKey`, and `APISecret`, then save them under **Settings → Features → Background Music Recognition**. Credentials are stored only in the macOS Keychain and are never revealed again in the settings UI.
+
+The online video panel offers:
+
+- **Off**: No music analysis and no music sample upload.
+- **Quick**: Up to three MP3 samples of about eight seconds each.
+- **Deep**: Up to ten MP3 samples of about eight seconds each.
+
+The app uses platform track metadata first, then calls iFlytek for additional recognition. Temporary downloaded audio and samples are deleted after processing. Music recognition warnings do not fail the transcript. Results are archived as `music-analysis.json` and can also be exported as JSON or TXT.
+
+Some Douyin or Xiaohongshu links may require login state. Select **Chrome Login State** under **Settings → Features → Online Video Login State** to let `yt-dlp` use `--cookies-from-browser chrome`. The app does not store platform passwords, copy Cookie contents, or write Cookies into project history.
+
+Development builds call iFlytek directly from the Mac. Before any public or commercial release, replace the provider with a backend proxy so vendor credentials are not distributed in the app, and review the applicable terms, privacy disclosure, and usage costs.
+
 ### 3. Build the App
 
 ```bash
@@ -75,10 +92,12 @@ You can also open `DeanConversionTool.xcodeproj` in Xcode and run the `DeanConve
 2. **Import media or paste a public video link**:
    - Click the local import action or drag and drop an audio/video file.
    - Paste a supported online video URL and start transcription.
+   - Optionally select quick or deep background music recognition.
 3. **Wait for processing**:
    - Audio preprocessing (converting to WAV format)
    - Whisper transcription
    - Speaker diarization (if enabled)
+   - Background music recognition (if enabled)
 4. **View results**:
    - Browse transcript segments.
    - See speaker labels and timestamps.
@@ -93,7 +112,7 @@ You can also open `DeanConversionTool.xcodeproj` in Xcode and run the `DeanConve
 ### Input Formats
 - **Audio**: MP3, WAV, M4A, AAC, FLAC, OGG, WMA
 - **Video**: MP4, MOV, AVI, MKV, WebM, M4V
-- **Online video**: Public links supported by `yt-dlp`, including YouTube, Bilibili, Douyin, and similar platforms
+- **Online video**: Links supported by `yt-dlp`, including YouTube, Bilibili, Douyin, Xiaohongshu, and similar platforms
 
 ### Output Formats
 - **SRT**: SubRip subtitle format for video editing
@@ -101,6 +120,7 @@ You can also open `DeanConversionTool.xcodeproj` in Xcode and run the `DeanConve
 - **Markdown**: Rich text with formatting, timestamps, and speaker labels
 - **HTML**: Beautiful web page with styling and interactive elements
 - **JSON**: Structured data for programmatic access
+- **Music analysis**: Separate JSON or TXT track lists
 
 ## Architecture
 
