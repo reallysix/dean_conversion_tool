@@ -1,6 +1,11 @@
 import AppKit
 import SwiftUI
 
+enum SettingsDestination {
+    case general
+    case musicRecognition
+}
+
 @MainActor
 final class SettingsWindowController {
     static let shared = SettingsWindowController()
@@ -9,9 +14,16 @@ final class SettingsWindowController {
 
     private init() {}
 
-    func show(relativeTo parentWindow: NSWindow?) {
-        let settingsWindow = window ?? makeWindow()
+    func show(
+        destination: SettingsDestination = .general,
+        relativeTo parentWindow: NSWindow?
+    ) {
+        let settingsWindow = window ?? makeWindow(destination: destination)
         window = settingsWindow
+
+        if let hostingView = settingsWindow.contentView as? NSHostingView<SettingsView> {
+            hostingView.rootView = SettingsView(destination: destination)
+        }
 
         position(settingsWindow, relativeTo: parentWindow)
 
@@ -27,8 +39,10 @@ final class SettingsWindowController {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func makeWindow() -> NSWindow {
-        let hostingView = NSHostingView(rootView: SettingsView())
+    private func makeWindow(destination: SettingsDestination) -> NSWindow {
+        let hostingView = NSHostingView(
+            rootView: SettingsView(destination: destination)
+        )
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 920, height: 620),
             styleMask: [.titled, .closable, .miniaturizable],

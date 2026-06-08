@@ -4,7 +4,15 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("defaultLanguage") private var defaultLanguage = "auto"
     @AppStorage("enableSpeakerDiarization") private var enableSpeakerDiarization = true
-    @State private var selectedSection: SettingsSection = .general
+    @State private var selectedSection: SettingsSection
+    private let destination: SettingsDestination
+
+    init(destination: SettingsDestination = .general) {
+        self.destination = destination
+        _selectedSection = State(
+            initialValue: destination == .musicRecognition ? .features : .general
+        )
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -14,27 +22,38 @@ struct SettingsView: View {
                 .fill(AppTheme.border)
                 .frame(width: 1)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    SettingsHeader(section: selectedSection)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        SettingsHeader(section: selectedSection)
 
-                    switch selectedSection {
-                    case .general:
-                        GeneralSettingsPanel(defaultLanguage: $defaultLanguage)
-                    case .model:
-                        ModelSettingsPanel()
-                    case .features:
-                        FeatureSettingsPanel(enableSpeakerDiarization: $enableSpeakerDiarization)
-                    case .about:
-                        AboutSettingsPanel()
+                        switch selectedSection {
+                        case .general:
+                            GeneralSettingsPanel(defaultLanguage: $defaultLanguage)
+                        case .model:
+                            ModelSettingsPanel()
+                        case .features:
+                            FeatureSettingsPanel(enableSpeakerDiarization: $enableSpeakerDiarization)
+                        case .about:
+                            AboutSettingsPanel()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(.horizontal, 44)
+                    .padding(.top, 42)
+                    .padding(.bottom, 40)
+                }
+                .background(AppTheme.workspace)
+                .onAppear {
+                    guard destination == .musicRecognition else { return }
+                    DispatchQueue.main.async {
+                        proxy.scrollTo(
+                            SettingsDestination.musicRecognitionAnchor,
+                            anchor: .top
+                        )
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .padding(.horizontal, 44)
-                .padding(.top, 42)
-                .padding(.bottom, 40)
             }
-            .background(AppTheme.workspace)
         }
         .frame(width: 920, height: 620)
         .background(AppTheme.workspace)
@@ -305,6 +324,7 @@ private struct FeatureSettingsPanel: View {
                     text: "个人测试版会从本机直接调用讯飞接口，音频样本会发送给讯飞。公开发布前应改为服务端代理并重新评估服务条款与费用。"
                 )
             }
+            .id(SettingsDestination.musicRecognitionAnchor)
 
             SettingsSectionGroup(title: "在线视频登录状态") {
                 SettingsRow(
@@ -337,6 +357,10 @@ private struct FeatureSettingsPanel: View {
             }
         }
     }
+}
+
+private extension SettingsDestination {
+    static let musicRecognitionAnchor = "music-recognition-settings"
 }
 
 private struct AboutSettingsPanel: View {
