@@ -74,6 +74,11 @@ class TranscriptViewModel: ObservableObject {
     @Published var playbackCurrentTime: TimeInterval = 0
     @Published var isResolvingOnlinePreview = false
     @Published var onlinePreviewError: String?
+    @Published var musicScanMode: MusicScanMode = .off
+    @Published var musicAnalysis: MusicAnalysis?
+    @Published var musicAnalysisMessage: String?
+    @Published var musicAnalysisIsError = false
+    @Published var lastExportedMusicFileURL: URL?
 
     // Selection is managed separately to avoid re-renders
     let selectionManager = SelectionManager()
@@ -133,6 +138,9 @@ class TranscriptViewModel: ObservableObject {
     private let historyStore = HistoryProjectStore()
     private let onlineVideoService = OnlineVideoService()
     private let modelDownloadService = ModelDownloadService()
+    private let credentialStore: XFYunCredentialStoring = KeychainXFYunCredentialStore()
+    private let musicSampleService = MusicSampleService()
+    private let musicExportService = MusicExportService()
 
     // MARK: - State
     private var tempWavPath: String?
@@ -274,6 +282,11 @@ class TranscriptViewModel: ObservableObject {
         lastFailedOnlineVideoURLString?.isEmpty == false && !isLoading
     }
 
+    private var onlineVideoCookieSource: OnlineVideoCookieSource {
+        let rawValue = UserDefaults.standard.string(forKey: "onlineVideoCookieSource")
+        return OnlineVideoCookieSource(rawValue: rawValue ?? "") ?? .none
+    }
+
     var onlineVideoInputState: OnlineVideoInputState {
         let trimmed = onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -322,6 +335,7 @@ class TranscriptViewModel: ObservableObject {
         error = nil
         lastFailedOnlineVideoURLString = nil
         transcript = nil
+        resetMusicAnalysis()
         progress = 0.0
         playbackCurrentTime = 0
 
@@ -374,10 +388,12 @@ class TranscriptViewModel: ObservableObject {
         }
         guard validateRequiredSetup(includeOnlineVideo: true) else { return }
 
+        let requestedMusicScanMode = musicScanMode
         isLoading = true
         error = nil
         lastFailedOnlineVideoURLString = nil
         transcript = nil
+        resetMusicAnalysis()
         player = nil
         isVideoFile = false
         playbackCurrentTime = 0
@@ -389,7 +405,10 @@ class TranscriptViewModel: ObservableObject {
             var download: OnlineVideoDownload?
             do {
                 updateLoading("正在下载在线视频音频...", progress: 0.05)
-                let downloadedVideo = try onlineVideoService.downloadAudio(from: normalizedURLString)
+                let downloadedVideo = try onlineVideoService.downloadAudio(
+                    from: normalizedURLString,
+                    cookieSource: onlineVideoCookieSource
+                )
                 download = downloadedVideo
 
                 let finalTranscript = try await processFileInternal(
@@ -397,12 +416,23 @@ class TranscriptViewModel: ObservableObject {
                     sourceURL: downloadedVideo.originalURL,
                     sourceTitle: downloadedVideo.title
                 ) { message, progress in
-                    self.updateLoading(message, progress: 0.1 + progress * 0.9)
+                    let scale = requestedMusicScanMode == .off ? 0.9 : 0.68
+                    self.updateLoading(message, progress: 0.1 + progress * scale)
                 }
 
                 self.transcript = finalTranscript
+                let analysis = await self.analyzeMusicIfRequested(
+                    download: downloadedVideo,
+                    transcript: finalTranscript,
+                    mode: requestedMusicScanMode
+                )
+                self.musicAnalysis = analysis
                 self.loadOnlinePreview(for: downloadedVideo.originalURL)
-                self.archiveTranscript(finalTranscript, sourceType: .onlineVideo)
+                self.archiveTranscript(
+                    finalTranscript,
+                    sourceType: .onlineVideo,
+                    musicAnalysis: analysis
+                )
                 self.progress = 1.0
                 self.loadingMessage = "完成！"
             } catch {
@@ -569,6 +599,62 @@ class TranscriptViewModel: ObservableObject {
         NSWorkspace.shared.activateFileViewerSelecting([lastExportedFileURL])
     }
 
+    func exportMusicAnalysis(format: MusicExportFormat) {
+        guard let transcript, let musicAnalysis else { return }
+
+        musicAnalysisMessage = nil
+        musicAnalysisIsError = false
+        lastExportedMusicFileURL = nil
+
+        let panel = NSOpenPanel()
+        panel.title = "选择导出目录"
+        panel.prompt = "导出"
+        panel.message = "将在所选目录中生成 \(format.displayName)"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+
+        guard panel.runModal() == .OK, let directoryURL = panel.url else { return }
+        let outputURL = uniqueMusicExportURL(
+            in: directoryURL,
+            transcript: transcript,
+            format: format
+        )
+
+        let didAccess = directoryURL.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                directoryURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            try musicExportService.export(
+                analysis: musicAnalysis,
+                format: format,
+                outputURL: outputURL
+            )
+            guard FileManager.default.fileExists(atPath: outputURL.path) else {
+                throw ExportError.fileNotCreated(outputURL.path)
+            }
+
+            musicAnalysisMessage = "已导出：\(outputURL.lastPathComponent)"
+            musicAnalysisIsError = false
+            lastExportedMusicFileURL = outputURL
+            NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+        } catch {
+            musicAnalysisMessage = "音乐分析导出失败：\(error.localizedDescription)"
+            musicAnalysisIsError = true
+            lastExportedMusicFileURL = nil
+        }
+    }
+
+    func revealLastExportedMusicFile() {
+        guard let lastExportedMusicFileURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([lastExportedMusicFileURL])
+    }
+
     private func uniqueExportURL(in directoryURL: URL, transcript: Transcript, format: ExportFormat) -> URL {
         let fileExtension = exportService.fileExtension(for: format)
         let baseName = sanitizedFileName("\(transcript.displayTitle)_transcript")
@@ -579,6 +665,27 @@ class TranscriptViewModel: ObservableObject {
             candidate = directoryURL
                 .appendingPathComponent("\(baseName) \(index)")
                 .appendingPathExtension(fileExtension)
+            index += 1
+        }
+
+        return candidate
+    }
+
+    private func uniqueMusicExportURL(
+        in directoryURL: URL,
+        transcript: Transcript,
+        format: MusicExportFormat
+    ) -> URL {
+        let baseName = sanitizedFileName("\(transcript.displayTitle)_music-analysis")
+        var candidate = directoryURL
+            .appendingPathComponent(baseName)
+            .appendingPathExtension(format.fileExtension)
+        var index = 2
+
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            candidate = directoryURL
+                .appendingPathComponent("\(baseName) \(index)")
+                .appendingPathExtension(format.fileExtension)
             index += 1
         }
 
@@ -613,6 +720,10 @@ class TranscriptViewModel: ObservableObject {
         do {
             let archivedTranscript = try historyStore.loadTranscript(for: project)
             transcript = archivedTranscript
+            musicAnalysis = try historyStore.loadMusicAnalysis(for: project)
+            musicAnalysisMessage = musicAnalysis?.warning
+            musicAnalysisIsError = musicAnalysis?.warning != nil
+            lastExportedMusicFileURL = nil
             selectedProjectID = project.id
             error = nil
             searchText = ""
@@ -667,10 +778,14 @@ class TranscriptViewModel: ObservableObject {
     }
 
     private func resolvePlayableVideoURL(from urlString: String) async throws -> URL {
-        try await withCheckedThrowingContinuation { continuation in
+        let cookieSource = onlineVideoCookieSource
+        return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let playableURL = try OnlineVideoService().playableVideoURL(from: urlString)
+                    let playableURL = try OnlineVideoService().playableVideoURL(
+                        from: urlString,
+                        cookieSource: cookieSource
+                    )
                     continuation.resume(returning: playableURL)
                 } catch {
                     continuation.resume(throwing: error)
@@ -684,9 +799,17 @@ class TranscriptViewModel: ObservableObject {
         processOnlineVideo(urlString: lastFailedOnlineVideoURLString)
     }
 
-    private func archiveTranscript(_ transcript: Transcript, sourceType: ProjectSourceType) {
+    private func archiveTranscript(
+        _ transcript: Transcript,
+        sourceType: ProjectSourceType,
+        musicAnalysis: MusicAnalysis? = nil
+    ) {
         do {
-            let project = try historyStore.saveTranscriptProject(transcript: transcript, sourceType: sourceType)
+            let project = try historyStore.saveTranscriptProject(
+                transcript: transcript,
+                sourceType: sourceType,
+                musicAnalysis: musicAnalysis
+            )
             selectedProjectID = project.id
             historyProjects = try historyStore.loadProjects()
         } catch {
@@ -699,6 +822,71 @@ class TranscriptViewModel: ObservableObject {
     private func updateLoading(_ message: String, progress: Double) {
         self.loadingMessage = message
         self.progress = progress
+    }
+
+    private func analyzeMusicIfRequested(
+        download: OnlineVideoDownload,
+        transcript: Transcript,
+        mode: MusicScanMode
+    ) async -> MusicAnalysis? {
+        guard mode != .off else {
+            return nil
+        }
+
+        updateLoading("正在准备背景音乐识别...", progress: 0.78)
+
+        let provider: MusicRecognitionProvider?
+        var credentialWarning: String?
+        do {
+            if let credentials = try credentialStore.load(), credentials.isComplete {
+                provider = XFYunMusicRecognitionProvider(credentials: credentials)
+            } else {
+                provider = nil
+            }
+        } catch {
+            provider = nil
+            credentialWarning = error.localizedDescription
+        }
+
+        let service = MusicAnalysisService(
+            sampleProducer: musicSampleService,
+            provider: provider
+        )
+        let analysis = await service.analyze(
+            sourceURL: download.originalURL,
+            audioURL: download.audioURL,
+            duration: transcript.duration,
+            transcriptSegments: transcript.segments,
+            metadata: download.metadata,
+            mode: mode
+        ) { completed, total in
+            Task { @MainActor in
+                let fraction = total > 0 ? Double(completed) / Double(total) : 1
+                self.updateLoading(
+                    "正在识别背景音乐 \(completed)/\(total)...",
+                    progress: 0.78 + fraction * 0.18
+                )
+            }
+        }
+
+        let warning = credentialWarning ?? analysis.warning
+        if let warning {
+            musicAnalysisMessage = "文稿已完成，但背景音乐识别失败：\(warning)"
+            musicAnalysisIsError = true
+        } else {
+            musicAnalysisMessage = analysis.tracks.isEmpty
+                ? "背景音乐扫描完成，暂未识别到歌曲"
+                : "已识别 \(analysis.tracks.count) 首背景音乐"
+            musicAnalysisIsError = false
+        }
+        return analysis
+    }
+
+    private func resetMusicAnalysis() {
+        musicAnalysis = nil
+        musicAnalysisMessage = nil
+        musicAnalysisIsError = false
+        lastExportedMusicFileURL = nil
     }
 
     private func validateRequiredSetup(includeOnlineVideo: Bool) -> Bool {
@@ -943,6 +1131,7 @@ class TranscriptViewModel: ObservableObject {
         player = nil
         isVideoFile = false
         transcript = nil
+        resetMusicAnalysis()
         selectedProjectID = nil
         selectionManager.deselectAll()
         cachedSegments = []
