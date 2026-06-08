@@ -33,6 +33,7 @@ struct ProjectOutputs: Codable, Equatable {
     var subtitlesSRT: String?
     var transcriptTXT: String?
     var transcriptMarkdown: String?
+    var musicAnalysisJSON: String?
 }
 
 struct OnlineSourceMetadata: Codable, Equatable {
@@ -63,5 +64,10 @@ struct HistoryProject: Identifiable, Codable, Equatable {
     var transcriptURL: URL? {
         guard let transcriptJSON = outputs.transcriptJSON else { return nil }
         return projectURL.appendingPathComponent(transcriptJSON)
+    }
+
+    var musicAnalysisURL: URL? {
+        guard let musicAnalysisJSON = outputs.musicAnalysisJSON else { return nil }
+        return projectURL.appendingPathComponent(musicAnalysisJSON)
     }
 }

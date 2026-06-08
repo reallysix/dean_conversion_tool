@@ -2,13 +2,21 @@ import Foundation
 
 final class HistoryProjectStore {
     private let fileManager: FileManager
+    private let customProjectsRootURL: URL?
     private let exportService = ExportService()
 
-    init(fileManager: FileManager = .default) {
+    init(
+        fileManager: FileManager = .default,
+        projectsRootURL: URL? = nil
+    ) {
         self.fileManager = fileManager
+        self.customProjectsRootURL = projectsRootURL
     }
 
     var projectsRootURL: URL {
+        if let customProjectsRootURL {
+            return customProjectsRootURL
+        }
         let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return documentsURL.appendingPathComponent("DeanConversionTool/Projects", isDirectory: true)
     }
@@ -39,7 +47,11 @@ final class HistoryProjectStore {
         return projects.sorted { $0.updatedAt > $1.updatedAt }
     }
 
-    func saveTranscriptProject(transcript: Transcript, sourceType: ProjectSourceType = .localFile) throws -> HistoryProject {
+    func saveTranscriptProject(
+        transcript: Transcript,
+        sourceType: ProjectSourceType = .localFile,
+        musicAnalysis: MusicAnalysis? = nil
+    ) throws -> HistoryProject {
         try ensureProjectsDirectory()
 
         let title = transcript.displayTitle
@@ -55,11 +67,18 @@ final class HistoryProjectStore {
         let srtFileName = "subtitles.srt"
         let txtFileName = "transcript.txt"
         let markdownFileName = "transcript.md"
+        let musicAnalysisFileName = musicAnalysis == nil ? nil : "music-analysis.json"
 
         try writeTranscriptJSON(transcript, to: projectDirectory.appendingPathComponent(transcriptFileName))
         try exportService.export(transcript: transcript, format: .srt, outputPath: projectDirectory.appendingPathComponent(srtFileName).path)
         try exportService.export(transcript: transcript, format: .txt, outputPath: projectDirectory.appendingPathComponent(txtFileName).path)
         try exportService.export(transcript: transcript, format: .markdown, outputPath: projectDirectory.appendingPathComponent(markdownFileName).path)
+        if let musicAnalysis, let musicAnalysisFileName {
+            try writeMusicAnalysis(
+                musicAnalysis,
+                to: projectDirectory.appendingPathComponent(musicAnalysisFileName)
+            )
+        }
 
         let project = HistoryProject(
             id: projectID,
@@ -77,7 +96,8 @@ final class HistoryProjectStore {
                 transcriptJSON: transcriptFileName,
                 subtitlesSRT: srtFileName,
                 transcriptTXT: txtFileName,
-                transcriptMarkdown: markdownFileName
+                transcriptMarkdown: markdownFileName,
+                musicAnalysisJSON: musicAnalysisFileName
             )
         )
 
@@ -107,6 +127,17 @@ final class HistoryProjectStore {
         return try decoder.decode(Transcript.self, from: data)
     }
 
+    func loadMusicAnalysis(for project: HistoryProject) throws -> MusicAnalysis? {
+        guard let musicAnalysisURL = project.musicAnalysisURL else {
+            return nil
+        }
+
+        let data = try Data(contentsOf: musicAnalysisURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(MusicAnalysis.self, from: data)
+    }
+
     private func writeProjectMetadata(_ project: HistoryProject) throws {
         let metadataURL = project.projectURL.appendingPathComponent("project.json")
         let encoder = JSONEncoder()
@@ -121,6 +152,14 @@ final class HistoryProjectStore {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(transcript)
+        try data.write(to: url, options: .atomic)
+    }
+
+    private func writeMusicAnalysis(_ analysis: MusicAnalysis, to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(analysis)
         try data.write(to: url, options: .atomic)
     }
 
@@ -149,6 +188,9 @@ final class HistoryProjectStore {
         }
         if host.contains("douyin.com") {
             return "抖音"
+        }
+        if host.contains("xiaohongshu.com") || host.contains("xhslink.com") {
+            return "小红书"
         }
         if host.contains("tiktok.com") {
             return "TikTok"
