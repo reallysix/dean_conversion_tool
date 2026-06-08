@@ -366,6 +366,10 @@ enum OnlineVideoError: LocalizedError {
         if lowercased.contains("private video") || lowercased.contains("this video is private") {
             return "这是私密视频，当前版本仅支持公开视频。"
         }
+        if lowercased.contains("confirm you’re not a bot") ||
+            lowercased.contains("confirm you're not a bot") {
+            return "YouTube 要求验证当前访问不是机器人。请先在 Chrome 登录 YouTube，再到设置 → 功能 → 在线视频登录状态中选择“Chrome 登录状态”，然后重试。"
+        }
         if lowercased.contains("sign in") || lowercased.contains("login") || lowercased.contains("cookies") {
             return "这个视频需要登录。请先在 Chrome 登录对应平台，再到设置中启用“Chrome 登录状态”。"
         }

@@ -40,4 +40,16 @@ final class OnlineVideoServiceTests: XCTestCase {
 
         XCTAssertEqual(try OnlineVideoMetadataParser.parse(data).platform, "小红书")
     }
+
+    func testYouTubeBotChallengeIsNotReportedAsRestrictedVideo() {
+        let message = """
+        ERROR: [youtube] rsVZQfOIDfk: Sign in to confirm you’re not a bot.
+        Use --cookies-from-browser or --cookies for the authentication.
+        """
+
+        XCTAssertEqual(
+            OnlineVideoError.downloadFailed(message).localizedDescription,
+            "在线视频下载失败：YouTube 要求验证当前访问不是机器人。请先在 Chrome 登录 YouTube，再到设置 → 功能 → 在线视频登录状态中选择“Chrome 登录状态”，然后重试。"
+        )
+    }
 }
