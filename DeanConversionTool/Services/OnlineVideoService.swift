@@ -1,9 +1,94 @@
 import Foundation
 
+enum OnlineVideoCookieSource: String, CaseIterable {
+    case none
+    case chrome
+
+    var displayName: String {
+        switch self {
+        case .none:
+            return "不使用"
+        case .chrome:
+            return "Chrome 登录状态"
+        }
+    }
+
+    var ytDLPArguments: [String] {
+        switch self {
+        case .none:
+            return []
+        case .chrome:
+            return ["--cookies-from-browser", "chrome"]
+        }
+    }
+}
+
+struct OnlineVideoMetadata: Equatable {
+    let title: String
+    let platform: String
+    let track: String?
+    let artist: String?
+}
+
+enum OnlineVideoMetadataParser {
+    private struct Payload: Decodable {
+        let title: String?
+        let webpageURL: String?
+        let extractorKey: String?
+        let track: String?
+        let artist: String?
+
+        enum CodingKeys: String, CodingKey {
+            case title
+            case webpageURL = "webpage_url"
+            case extractorKey = "extractor_key"
+            case track
+            case artist
+        }
+    }
+
+    static func parse(_ data: Data) throws -> OnlineVideoMetadata {
+        let payload = try JSONDecoder().decode(Payload.self, from: data)
+        return OnlineVideoMetadata(
+            title: payload.title?.trimmed.nilIfEmpty ?? "在线视频",
+            platform: platformName(
+                extractorKey: payload.extractorKey,
+                webpageURL: payload.webpageURL
+            ),
+            track: payload.track?.trimmed.nilIfEmpty,
+            artist: payload.artist?.trimmed.nilIfEmpty
+        )
+    }
+
+    static func platformName(extractorKey: String?, webpageURL: String?) -> String {
+        let source = "\(extractorKey ?? "") \(webpageURL ?? "")".lowercased()
+        if source.contains("youtube") || source.contains("youtu.be") {
+            return "YouTube"
+        }
+        if source.contains("bilibili") || source.contains("b23.tv") {
+            return "B 站"
+        }
+        if source.contains("douyin") {
+            return "抖音"
+        }
+        if source.contains("tiktok") {
+            return "TikTok"
+        }
+        if source.contains("xiaohongshu") || source.contains("xhslink") {
+            return "小红书"
+        }
+        if source.contains("vimeo") {
+            return "Vimeo"
+        }
+        return "公开网页视频"
+    }
+}
+
 struct OnlineVideoDownload {
     let originalURL: URL
     let title: String
     let audioURL: URL
+    let metadata: OnlineVideoMetadata
 }
 
 final class OnlineVideoService {
@@ -15,7 +100,10 @@ final class OnlineVideoService {
         denoPath != nil
     }
 
-    func playableVideoURL(from urlString: String) throws -> URL {
+    func playableVideoURL(
+        from urlString: String,
+        cookieSource: OnlineVideoCookieSource = .none
+    ) throws -> URL {
         guard let originalURL = URL(string: urlString), originalURL.scheme != nil else {
             throw OnlineVideoError.invalidURL
         }
@@ -41,6 +129,7 @@ final class OnlineVideoService {
             arguments.append(contentsOf: ["--js-runtimes", "deno:\(denoPath)"])
         }
 
+        arguments.append(contentsOf: cookieSource.ytDLPArguments)
         arguments.append(originalURL.absoluteString)
         process.arguments = arguments
 
@@ -71,7 +160,10 @@ final class OnlineVideoService {
         return playableURL
     }
 
-    func downloadAudio(from urlString: String) throws -> OnlineVideoDownload {
+    func downloadAudio(
+        from urlString: String,
+        cookieSource: OnlineVideoCookieSource = .none
+    ) throws -> OnlineVideoDownload {
         guard let originalURL = URL(string: urlString), originalURL.scheme != nil else {
             throw OnlineVideoError.invalidURL
         }
@@ -92,6 +184,7 @@ final class OnlineVideoService {
             "--no-playlist",
             "--extract-audio",
             "--audio-format", "m4a",
+            "--write-info-json",
             "--print", "after_move:%(title)s",
             "--output", outputTemplate,
         ]
@@ -104,6 +197,7 @@ final class OnlineVideoService {
             arguments.append(contentsOf: ["--js-runtimes", "deno:\(denoPath)"])
         }
 
+        arguments.append(contentsOf: cookieSource.ytDLPArguments)
         arguments.append(originalURL.absoluteString)
         process.arguments = arguments
 
@@ -134,16 +228,32 @@ final class OnlineVideoService {
             throw OnlineVideoError.downloadedAudioMissing
         }
 
-        let title = output
+        let printedTitle = output
             .split(separator: "\n")
             .last
             .map { String($0) }?
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
+        let fallbackTitle = printedTitle?.nilIfEmpty ?? originalURL.absoluteString
+        let metadata = files
+            .first(where: { $0.lastPathComponent.hasSuffix(".info.json") })
+            .flatMap { try? Data(contentsOf: $0) }
+            .flatMap { try? OnlineVideoMetadataParser.parse($0) }
+            ?? OnlineVideoMetadata(
+                title: fallbackTitle,
+                platform: OnlineVideoMetadataParser.platformName(
+                    extractorKey: nil,
+                    webpageURL: originalURL.absoluteString
+                ),
+                track: nil,
+                artist: nil
+            )
+
         return OnlineVideoDownload(
             originalURL: originalURL,
-            title: title?.isEmpty == false ? title! : originalURL.absoluteString,
-            audioURL: audioURL
+            title: metadata.title,
+            audioURL: audioURL,
+            metadata: metadata
         )
     }
 
@@ -257,7 +367,7 @@ enum OnlineVideoError: LocalizedError {
             return "这是私密视频，当前版本仅支持公开视频。"
         }
         if lowercased.contains("sign in") || lowercased.contains("login") || lowercased.contains("cookies") {
-            return "这个视频需要登录或权限，当前版本仅支持公开视频。"
+            return "这个视频需要登录。请先在 Chrome 登录对应平台，再到设置中启用“Chrome 登录状态”。"
         }
         if lowercased.contains("not available in your country") ||
             lowercased.contains("geo restricted") ||
@@ -284,5 +394,15 @@ enum OnlineVideoError: LocalizedError {
             .filter { !$0.isEmpty && !$0.hasPrefix("WARNING:") }
 
         return lines.prefix(2).joined(separator: "\n")
+    }
+}
+
+private extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
