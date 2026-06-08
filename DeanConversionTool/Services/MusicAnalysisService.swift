@@ -32,7 +32,9 @@ final class MusicAnalysisService {
                 tracks: platformTracks,
                 unmatchedSampleCount: 0,
                 providerName: nil,
-                warning: nil
+                warning: nil,
+                outcome: .completed,
+                submittedSampleCount: 0
             )
         }
         guard let provider else {
@@ -43,7 +45,9 @@ final class MusicAnalysisService {
                 tracks: platformTracks,
                 unmatchedSampleCount: 0,
                 providerName: nil,
-                warning: "未配置讯飞音乐识别凭据，仅保留平台标注结果"
+                warning: "未配置讯飞音乐识别凭据，仅保留平台标注结果",
+                outcome: .notConfigured,
+                submittedSampleCount: 0
             )
         }
 
@@ -63,7 +67,9 @@ final class MusicAnalysisService {
                 tracks: platformTracks,
                 unmatchedSampleCount: 0,
                 providerName: provider.name,
-                warning: "音乐样本提取失败：\(error.localizedDescription)"
+                warning: "音乐样本提取失败：\(error.localizedDescription)",
+                outcome: .failed,
+                submittedSampleCount: 0
             )
         }
         defer { sampleProducer.cleanup(samples: samples) }
@@ -101,6 +107,14 @@ final class MusicAnalysisService {
             platformTracks,
             with: providerTracks
         ).sorted(by: trackSort)
+        let outcome: MusicAnalysisOutcome
+        if warnings.isEmpty {
+            outcome = .completed
+        } else if providerTracks.isEmpty {
+            outcome = .failed
+        } else {
+            outcome = .partialFailure
+        }
 
         return MusicAnalysis(
             sourceURL: sourceURL,
@@ -109,7 +123,9 @@ final class MusicAnalysisService {
             tracks: tracks,
             unmatchedSampleCount: unmatchedSampleCount,
             providerName: provider.name,
-            warning: warnings.isEmpty ? nil : warnings.joined(separator: "；")
+            warning: warnings.isEmpty ? nil : warnings.joined(separator: "；"),
+            outcome: outcome,
+            submittedSampleCount: samples.count
         )
     }
 

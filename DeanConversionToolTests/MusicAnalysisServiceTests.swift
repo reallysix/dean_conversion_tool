@@ -47,6 +47,8 @@ final class MusicAnalysisServiceTests: XCTestCase {
         XCTAssertEqual(analysis.tracks[0].startTime, 11)
         XCTAssertEqual(analysis.tracks[0].endTime, 48)
         XCTAssertEqual(analysis.unmatchedSampleCount, 1)
+        XCTAssertEqual(analysis.outcome, .completed)
+        XCTAssertEqual(analysis.submittedSampleCount, 3)
     }
 
     func testPlatformMetadataCreatesUntimedTrack() async {
@@ -99,6 +101,8 @@ final class MusicAnalysisServiceTests: XCTestCase {
 
         XCTAssertEqual(analysis.tracks.map(\.title), ["Known Song"])
         XCTAssertNotNil(analysis.warning)
+        XCTAssertEqual(analysis.outcome, .notConfigured)
+        XCTAssertEqual(analysis.submittedSampleCount, 0)
     }
 
     func testProviderErrorDoesNotDiscardSuccessfulMatches() async {
@@ -133,6 +137,33 @@ final class MusicAnalysisServiceTests: XCTestCase {
         XCTAssertEqual(analysis.tracks.map(\.title), ["Found"])
         XCTAssertEqual(analysis.unmatchedSampleCount, 1)
         XCTAssertNotNil(analysis.warning)
+        XCTAssertEqual(analysis.outcome, .partialFailure)
+        XCTAssertEqual(analysis.submittedSampleCount, 2)
+    }
+
+    func testAllProviderCallsFailWithFailedOutcome() async {
+        let service = MusicAnalysisService(
+            sampleProducer: FakeSampleProducer(result: [
+                sample(path: "/tmp/1.mp3", startTime: 0),
+                sample(path: "/tmp/2.mp3", startTime: 20),
+            ]),
+            provider: FakeMusicProvider(responses: [
+                .failure(FakeError.failed),
+                .failure(FakeError.failed),
+            ])
+        )
+
+        let analysis = await service.analyze(
+            sourceURL: URL(string: "https://example.com/video")!,
+            audioURL: URL(fileURLWithPath: "/tmp/source.m4a"),
+            duration: 30,
+            transcriptSegments: [],
+            metadata: metadata(),
+            mode: .quick
+        )
+
+        XCTAssertEqual(analysis.outcome, .failed)
+        XCTAssertEqual(analysis.submittedSampleCount, 2)
     }
 
     private func sample(path: String, startTime: TimeInterval) -> MusicAudioSample {

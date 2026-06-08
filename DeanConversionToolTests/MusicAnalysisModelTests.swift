@@ -34,4 +34,23 @@ final class MusicAnalysisModelTests: XCTestCase {
         XCTAssertEqual(MusicScanMode.quick.maxSampleCount, 3)
         XCTAssertEqual(MusicScanMode.deep.maxSampleCount, 10)
     }
+
+    func testOldMusicAnalysisJSONDefaultsToCompletedOutcome() throws {
+        let data = """
+        {
+          "sourceURL": "https://example.com/video",
+          "createdAt": "2026-06-08T08:00:00Z",
+          "scanMode": "quick",
+          "tracks": [],
+          "unmatchedSampleCount": 0
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let analysis = try decoder.decode(MusicAnalysis.self, from: data)
+
+        XCTAssertEqual(analysis.outcome, .completed)
+        XCTAssertEqual(analysis.submittedSampleCount, 0)
+    }
 }
