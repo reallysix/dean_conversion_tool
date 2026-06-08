@@ -946,6 +946,9 @@ class TranscriptViewModel: ObservableObject {
         if host.contains("douyin.com") {
             return "抖音"
         }
+        if host.contains("xiaohongshu.com") || host.contains("xhslink.com") {
+            return "小红书"
+        }
         if host.contains("tiktok.com") {
             return "TikTok"
         }

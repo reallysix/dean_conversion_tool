@@ -220,6 +220,9 @@ private struct ModelSettingsPanel: View {
 
 private struct FeatureSettingsPanel: View {
     @Binding var enableSpeakerDiarization: Bool
+    @AppStorage("onlineVideoCookieSource")
+    private var onlineVideoCookieSource = OnlineVideoCookieSource.none.rawValue
+    @StateObject private var musicSettings = MusicRecognitionSettingsViewModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -235,6 +238,92 @@ private struct FeatureSettingsPanel: View {
                         text: "该能力需要 Python、pyannote.audio 和 Hugging Face 模型授权。缺失时不影响基础转写。"
                     )
                 }
+            }
+
+            SettingsSectionGroup(title: "背景音乐识别") {
+                SettingsRow(
+                    title: "讯飞 ACRCloud",
+                    subtitle: "识别在线转写视频中使用的背景音乐。"
+                ) {
+                    StatusPill(
+                        text: musicSettings.isConfigured ? "已配置" : "未配置",
+                        color: musicSettings.isConfigured
+                            ? AppTheme.success
+                            : AppTheme.textTertiary
+                    )
+                }
+
+                SettingsRow(
+                    title: "APPID",
+                    subtitle: "输入新值后会覆盖钥匙串中的现有凭据。"
+                ) {
+                    TextField("输入 APPID", text: $musicSettings.appID)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 230)
+                }
+
+                SettingsRow(
+                    title: "APIKey",
+                    subtitle: "保存后不会在界面中再次显示。"
+                ) {
+                    SecureField("输入 APIKey", text: $musicSettings.apiKey)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 230)
+                }
+
+                SettingsRow(
+                    title: "APISecret",
+                    subtitle: "仅保存在当前 Mac 的系统钥匙串。"
+                ) {
+                    SecureField("输入 APISecret", text: $musicSettings.apiSecret)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 230)
+                }
+
+                HStack(spacing: 10) {
+                    Button("保存凭证", action: musicSettings.save)
+                        .buttonStyle(.borderedProminent)
+                    Button("清除凭证", action: musicSettings.clear)
+                        .buttonStyle(.bordered)
+                        .disabled(!musicSettings.isConfigured)
+                    Spacer()
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+
+                if let message = musicSettings.statusMessage {
+                    SettingsNotice(
+                        icon: musicSettings.statusIsError
+                            ? "exclamationmark.circle"
+                            : "checkmark.circle",
+                        text: message
+                    )
+                }
+
+                SettingsNotice(
+                    icon: "lock.shield",
+                    text: "个人测试版会从本机直接调用讯飞接口，音频样本会发送给讯飞。公开发布前应改为服务端代理并重新评估服务条款与费用。"
+                )
+            }
+
+            SettingsSectionGroup(title: "在线视频登录状态") {
+                SettingsRow(
+                    title: "受限视频",
+                    subtitle: "部分抖音、小红书等链接可能需要浏览器登录状态。"
+                ) {
+                    Picker("", selection: $onlineVideoCookieSource) {
+                        ForEach(OnlineVideoCookieSource.allCases, id: \.rawValue) { source in
+                            Text(source.displayName).tag(source.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 180)
+                }
+
+                SettingsNotice(
+                    icon: "person.crop.circle.badge.checkmark",
+                    text: "选择 Chrome 后，工具仅在解析时调用 yt-dlp 读取 Chrome 的现有 Cookie；不会保存平台密码或复制 Cookie 内容。"
+                )
             }
 
             SettingsSectionGroup(title: "导出") {

@@ -269,7 +269,7 @@ struct WelcomeView: View {
             }
         }
 
-        ActionPanel(icon: "link", title: "在线视频", subtitle: "YouTube、B 站、抖音等公开链接") {
+        ActionPanel(icon: "link", title: "在线视频", subtitle: "YouTube、B 站、抖音、小红书等链接") {
             VStack(spacing: 10) {
                 let inputState = viewModel.onlineVideoInputState
                 HStack(spacing: 8) {
@@ -298,6 +298,16 @@ struct WelcomeView: View {
                         .foregroundColor(inputState.isReady ? AppTheme.success : AppTheme.textTertiary)
                         .lineLimit(1)
                     Spacer(minLength: 0)
+                }
+
+                MusicScanModePicker(mode: $viewModel.musicScanMode)
+
+                if viewModel.musicScanMode != .off {
+                    Text("快速最多 3 段，深度最多 10 段；音频样本会发送到讯飞。")
+                        .font(.system(size: 10))
+                        .foregroundColor(AppTheme.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 PrimaryActionButton(icon: "arrow.down.circle", title: "解析并转写") {

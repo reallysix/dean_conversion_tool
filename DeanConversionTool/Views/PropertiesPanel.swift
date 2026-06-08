@@ -23,6 +23,62 @@ struct PropertiesPanel: View {
                         PropertyRow(label: "语言", value: transcript.language ?? "自动")
                     }
 
+                    if let analysis = viewModel.musicAnalysis {
+                        PropertiesSection(title: "背景音乐") {
+                            if analysis.tracks.isEmpty {
+                                Text("暂未识别到歌曲")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(AppTheme.textTertiary)
+                                    .padding(.vertical, 4)
+                            } else {
+                                ForEach(analysis.tracks) { track in
+                                    MusicTrackRow(track: track)
+                                }
+                            }
+
+                            PropertyRow(
+                                label: "未命中样本",
+                                value: "\(analysis.unmatchedSampleCount)"
+                            )
+
+                            if let providerName = analysis.providerName {
+                                PropertyRow(label: "识别服务", value: providerName)
+                            }
+
+                            if viewModel.lastExportedMusicFileURL == nil,
+                               let message = viewModel.musicAnalysisMessage {
+                                MusicAnalysisStatusView(
+                                    message: message,
+                                    isError: viewModel.musicAnalysisIsError
+                                )
+                            } else if let warning = analysis.warning {
+                                MusicAnalysisStatusView(
+                                    message: warning,
+                                    isError: true
+                                )
+                            }
+
+                            HStack(spacing: 8) {
+                                PropertyButton(title: "导出 JSON") {
+                                    viewModel.exportMusicAnalysis(format: .json)
+                                }
+                                PropertyButton(title: "导出 TXT") {
+                                    viewModel.exportMusicAnalysis(format: .txt)
+                                }
+                            }
+
+                            if viewModel.lastExportedMusicFileURL != nil,
+                               let message = viewModel.musicAnalysisMessage {
+                                ExportStatusView(
+                                    message: message,
+                                    isError: viewModel.musicAnalysisIsError,
+                                    fileURL: viewModel.lastExportedMusicFileURL,
+                                    revealAction: viewModel.revealLastExportedMusicFile
+                                )
+                            }
+                        }
+                    }
+
                     PropertiesSection(title: "说话人") {
                         ForEach(transcript.speakers, id: \.self) { speaker in
                             let count = transcript.segments.filter { $0.speaker == speaker }.count
@@ -81,6 +137,25 @@ struct PropertiesPanel: View {
             return String(format: "%d:%02d:%02d", hours, minutes, seconds)
         }
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+}
+
+private struct MusicAnalysisStatusView: View {
+    let message: String
+    let isError: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Circle()
+                .fill(isError ? AppTheme.danger : AppTheme.success)
+                .frame(width: 7, height: 7)
+                .padding(.top, 4)
+            Text(message)
+                .font(.system(size: 10))
+                .foregroundColor(isError ? AppTheme.danger : AppTheme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 4)
     }
 }
 
