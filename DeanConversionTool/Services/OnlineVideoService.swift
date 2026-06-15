@@ -30,6 +30,22 @@ struct OnlineVideoMetadata: Equatable {
     let artist: String?
 }
 
+enum OnlineVideoPlaybackURL {
+    static let preferredFormat = "best[ext=mp4][vcodec^=h264]/best[ext=mp4][vcodec^=avc]/best[ext=mp4]/best"
+
+    static func normalized(_ url: URL) -> URL {
+        guard url.scheme?.lowercased() == "http",
+              let host = url.host?.lowercased(),
+              host == "xhscdn.com" || host.hasSuffix(".xhscdn.com"),
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+
+        components.scheme = "https"
+        return components.url ?? url
+    }
+}
+
 enum OnlineVideoMetadataParser {
     private struct Payload: Decodable {
         let title: String?
@@ -117,7 +133,7 @@ final class OnlineVideoService {
 
         var arguments = [
             "--no-playlist",
-            "--format", "best[ext=mp4]/best",
+            "--format", OnlineVideoPlaybackURL.preferredFormat,
             "--get-url"
         ]
 
@@ -157,7 +173,7 @@ final class OnlineVideoService {
             throw OnlineVideoError.playableURLMissing
         }
 
-        return playableURL
+        return OnlineVideoPlaybackURL.normalized(playableURL)
     }
 
     func downloadAudio(

@@ -56,7 +56,17 @@ class TranscriptViewModel: ObservableObject {
     @Published var selectedFormat: ExportFormat = .markdown
     @Published var historyProjects: [HistoryProject] = []
     @Published var selectedProjectID: UUID?
-    @Published var onlineVideoURL = ""
+    @Published var onlineVideoURL = "" {
+        didSet {
+            let trimmed = onlineVideoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let normalized = normalizedOnlineVideoURLString(from: trimmed),
+                  trimmed != normalized,
+                  trimmed.contains(normalized) else {
+                return
+            }
+            onlineVideoURL = normalized
+        }
+    }
     @Published var isDownloadingModel = false
     @Published var modelDownloadProgress = 0.0
     @Published var modelDownloadMessage = ""
@@ -1097,13 +1107,15 @@ class TranscriptViewModel: ObservableObject {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
+        let detectedLink = firstOnlineVideoLink(in: trimmed)
+        let valueToNormalize = detectedLink ?? trimmed
         let candidate: String
-        if trimmed.contains("://") {
-            candidate = trimmed
-        } else if trimmed.hasPrefix("www.") || trimmed.contains(".") {
-            candidate = "https://\(trimmed)"
+        if valueToNormalize.contains("://") {
+            candidate = valueToNormalize
+        } else if valueToNormalize.hasPrefix("www.") || valueToNormalize.contains(".") {
+            candidate = "https://\(valueToNormalize)"
         } else {
-            candidate = trimmed
+            candidate = valueToNormalize
         }
 
         guard let url = URL(string: candidate),
@@ -1114,6 +1126,27 @@ class TranscriptViewModel: ObservableObject {
         }
 
         return candidate
+    }
+
+    private func firstOnlineVideoLink(in value: String) -> String? {
+        guard let detector = try? NSDataDetector(
+            types: NSTextCheckingResult.CheckingType.link.rawValue
+        ) else {
+            return nil
+        }
+
+        let searchRange = NSRange(value.startIndex..<value.endIndex, in: value)
+        for match in detector.matches(in: value, range: searchRange) {
+            guard let url = match.url,
+                  let scheme = url.scheme?.lowercased(),
+                  ["http", "https"].contains(scheme),
+                  let range = Range(match.range, in: value) else {
+                continue
+            }
+            return String(value[range])
+        }
+
+        return nil
     }
 
     private func onlineVideoPlatformName(host: String) -> String? {

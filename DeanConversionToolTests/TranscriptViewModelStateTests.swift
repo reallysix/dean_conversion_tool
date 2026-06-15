@@ -49,4 +49,18 @@ final class TranscriptViewModelStateTests: XCTestCase {
 
         XCTAssertFalse(viewModel.canRecognizeMusicForCurrentTranscript)
     }
+
+    func testOnlineVideoInputStateExtractsURLFromSharedText() {
+        let viewModel = TranscriptViewModel()
+        viewModel.onlineVideoURL = """
+        专家预言金融危机，普通人怎么自救？ http://xhslink.com/o/JjNOWnHrJJ 复制后打开【小红书】查看笔记！
+        """
+
+        let state = viewModel.onlineVideoInputState
+
+        XCTAssertEqual(viewModel.onlineVideoURL, "http://xhslink.com/o/JjNOWnHrJJ")
+        XCTAssertTrue(state.isReady)
+        XCTAssertEqual(state.platformName, "小红书")
+        XCTAssertEqual(state.normalizedURLString, "http://xhslink.com/o/JjNOWnHrJJ")
+    }
 }

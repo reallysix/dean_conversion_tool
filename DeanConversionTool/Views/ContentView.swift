@@ -30,11 +30,13 @@ struct ContentView: View {
                         .frame(width: AppTheme.propertiesPanelWidth)
                 }
 
-                Rectangle()
-                    .fill(AppTheme.border)
-                    .frame(height: 1)
-                BottomBar(viewModel: viewModel)
-                    .frame(height: AppTheme.bottomBarHeight)
+                if viewModel.player == nil {
+                    Rectangle()
+                        .fill(AppTheme.border)
+                        .frame(height: 1)
+                    BottomBar(viewModel: viewModel)
+                        .frame(height: AppTheme.bottomBarHeight)
+                }
             }
         }
         .frame(minWidth: 1280, minHeight: 760)
@@ -132,10 +134,14 @@ struct TranscriptContainerView: View {
         if let player = viewModel.player, viewModel.isVideoFile {
             CompactVideoPlayerView(player: player)
                 .frame(height: 260)
+            BottomBar(viewModel: viewModel)
+                .frame(height: AppTheme.bottomBarHeight)
             Rectangle().fill(AppTheme.border).frame(height: 1)
         } else if let sourceURL = viewModel.transcript?.sourceURL, !sourceURL.isFileURL {
             if let player = viewModel.player {
                 OnlineVideoPlayerPreview(sourceURL: sourceURL, player: player)
+                BottomBar(viewModel: viewModel)
+                    .frame(height: AppTheme.bottomBarHeight)
             } else {
                 OnlineVideoEmbedView(
                     sourceURL: sourceURL,
@@ -238,14 +244,8 @@ struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 22) {
                 WorkbenchHero()
 
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 14) {
-                        actionPanels
-                    }
-
-                    VStack(alignment: .leading, spacing: 14) {
-                        actionPanels
-                    }
+                HStack(alignment: .top, spacing: 14) {
+                    actionPanels
                 }
 
                 RecentProjectsPreview(projects: Array(viewModel.historyProjects.prefix(3))) { project in
@@ -279,9 +279,14 @@ struct WelcomeView: View {
                     TextField("https://...", text: $viewModel.onlineVideoURL)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
+                        .lineLimit(1)
+                        .frame(minWidth: 0, maxWidth: .infinity)
+                        .layoutPriority(-1)
                 }
                 .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity)
                 .frame(height: 40)
+                .clipped()
                 .background(AppTheme.surfaceHover)
                 .overlay(
                     RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMedium)

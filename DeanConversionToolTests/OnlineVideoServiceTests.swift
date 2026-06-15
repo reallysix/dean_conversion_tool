@@ -41,6 +41,25 @@ final class OnlineVideoServiceTests: XCTestCase {
         XCTAssertEqual(try OnlineVideoMetadataParser.parse(data).platform, "小红书")
     }
 
+    func testUpgradesXiaohongshuPlaybackURLToHTTPS() throws {
+        let url = try XCTUnwrap(URL(
+            string: "http://sns-bak-v6.xhscdn.com/stream/video.mp4"
+        ))
+
+        XCTAssertEqual(
+            OnlineVideoPlaybackURL.normalized(url).absoluteString,
+            "https://sns-bak-v6.xhscdn.com/stream/video.mp4"
+        )
+    }
+
+    func testDoesNotUpgradeUnrelatedHTTPPlaybackURL() throws {
+        let url = try XCTUnwrap(URL(
+            string: "http://media.example.com/video.mp4"
+        ))
+
+        XCTAssertEqual(OnlineVideoPlaybackURL.normalized(url), url)
+    }
+
     func testYouTubeBotChallengeIsNotReportedAsRestrictedVideo() {
         let message = """
         ERROR: [youtube] rsVZQfOIDfk: Sign in to confirm you’re not a bot.
